@@ -291,10 +291,13 @@ async def announce(interaction: discord.Interaction,
         async def on_submit(self, modal_interaction: discord.Interaction):
             await modal_interaction.response.defer(thinking=True, ephemeral=True)
             
-            # Create professional announcement embed
+            # Create professional announcement embed with code block formatting
+            formatted_message = (
+                "📢 **Official Announcement**\n\n"
+                f"```\n{self.message.value}\n```"
+            )
             embed = create_embed(
-                title=" ",
-                description=self.message.value,
+                description=formatted_message,
                 color=discord.Color.gold()
             )
             
@@ -370,10 +373,13 @@ async def attach_announce(interaction: discord.Interaction,
         )
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     
-    # Create professional announcement embed
+    # Create professional announcement embed with code block formatting
+    formatted_message = (
+        "📢 **Official Announcement**\n\n"
+        f"```\n{message}\n```"
+    )
     embed = create_embed(
-        title=" ",
-        description=message,
+        description=formatted_message,
         color=discord.Color.gold()
     )
     
@@ -452,9 +458,13 @@ async def reply(interaction: discord.Interaction,
     try:
         message = await channel.fetch_message(int(message_id))
         
-        # Create professional reply embed
+        # Create professional reply embed with code block formatting
+        formatted_content = (
+            f"**Reply to [this message]({message.jump_url})**\n\n"
+            f"```\n{content}\n```"
+        )
         embed = create_embed(
-            description=f"**Reply to [this message]({message.jump_url})**\n\n{content}",
+            description=formatted_content,
             color=discord.Color.blue()
         )
         
@@ -499,15 +509,13 @@ async def dm(interaction: discord.Interaction,
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     
     try:
-        # Format message in code block to preserve formatting and increase visibility
+        # Create professional DM embed with code block formatting
         formatted_message = (
             "📨 **Message from Nexus Esports**\n\n"
             "For any queries or further support, contact @acroneop in our Official Server:\n"
             "https://discord.gg/xPGJCWpMbM\n\n"
             f"```\n{message}\n```"
         )
-        
-        # Create DM embed
         embed = discord.Embed(
             description=formatted_message,
             color=discord.Color.blue(),
