@@ -54,7 +54,7 @@ async def on_ready():
     global commands_synced
     print(f"✅ Bot ready! Logged in as {bot.user}")
     
-    # Print invite link
+    # Print invite link with proper scopes
     invite_url = discord.utils.oauth_url(
         bot.user.id,
         permissions=discord.Permissions(
@@ -62,11 +62,12 @@ async def on_ready():
             embed_links=True,
             view_channel=True,
             read_message_history=True,
-            mention_everyone=True
+            mention_everyone=True,
+            manage_messages=True
         ),
         scopes=("bot", "applications.commands")
     )
-    print(f"\n🔗 Add bot to other servers using this link:\n{invite_url}\n")
+    print(f"\n🔗 Add bot to other servers using this link (MUST include 'applications.commands' scope):\n{invite_url}\n")
     
     if not commands_synced:
         try:
@@ -185,6 +186,20 @@ async def sync_commands(interaction: discord.Interaction):
         )
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     
+    # Generate invite URL with proper scopes for troubleshooting
+    invite_url = discord.utils.oauth_url(
+        bot.user.id,
+        permissions=discord.Permissions(
+            send_messages=True,
+            embed_links=True,
+            view_channel=True,
+            read_message_history=True,
+            mention_everyone=True,
+            manage_messages=True
+        ),
+        scopes=("bot", "applications.commands")
+    )
+    
     try:
         # Sync for the current guild
         if interaction.guild:
@@ -200,10 +215,41 @@ async def sync_commands(interaction: discord.Interaction):
             color=discord.Color.green()
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
+    except discord.Forbidden as e:
+        # Provide detailed troubleshooting for permission issues
+        description = (
+            f"❌ **Sync Failed: Bot lacks permissions**\n"
+            f"Error: `{e}`\n\n"
+            "**Troubleshooting Steps:**\n"
+            "1. Re-invite the bot using this link with proper permissions:\n"
+            f"{invite_url}\n"
+            "2. Ensure the bot has **Manage Server** permission\n"
+            "3. Server owner must run this command\n"
+            "4. Check bot has `applications.commands` scope\n"
+            "5. Wait 1 hour after bot invite for permissions to propagate"
+        )
+        embed = create_embed(
+            title="❌ Sync Failed - Permissions Issue",
+            description=description,
+            color=discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
     except Exception as e:
+        # Provide detailed troubleshooting for other issues
+        description = (
+            f"❌ **Sync Failed**\n"
+            f"Error: `{e}`\n\n"
+            "**Troubleshooting Steps:**\n"
+            "1. Ensure the bot has `applications.commands` scope in invite\n"
+            "2. Re-invite the bot using this link:\n"
+            f"{invite_url}\n"
+            "3. Server owner must run this command\n"
+            "4. Try again in 5 minutes (Discord API might be slow)\n"
+            "5. Contact support if issue persists"
+        )
         embed = create_embed(
             title="❌ Sync Failed",
-            description=f"Error: {e}",
+            description=description,
             color=discord.Color.red()
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
