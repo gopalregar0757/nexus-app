@@ -72,12 +72,12 @@ async def sync_cmds(interaction: discord.Interaction):
 @app_commands.describe(
     channel="Channel to send announcement to",
     message="Announcement message content",
-    ping_role="Optional role to ping (use @role)"
+    ping_everyone="Ping @everyone with this announcement"
 )
 async def send_announce(interaction: discord.Interaction, 
                         channel: discord.TextChannel, 
                         message: str,
-                        ping_role: discord.Role = None):
+                        ping_everyone: bool = False):
     # Permission check
     if not has_announcement_permission(interaction):
         return await interaction.response.send_message(
@@ -85,27 +85,37 @@ async def send_announce(interaction: discord.Interaction,
             ephemeral=True
         )
     
-    # Create embed
+    # Create clean embed without attribution
     embed = discord.Embed(
         title="📢 Announcement",
         description=message,
         color=discord.Color.gold()
     )
-    embed.set_footer(text=f"Announced by {interaction.user.display_name}")
     
     try:
         # Prepare ping string
-        ping_str = f"{ping_role.mention} " if ping_role else ""
+        ping_str = "@everyone " if ping_everyone else ""
         
         # Send announcement
-        await channel.send(f"{ping_str}\n", embed=embed)
+        await channel.send(
+            content=f"{ping_str}\n", 
+            embed=embed,
+            allowed_mentions=discord.AllowedMentions(everyone=True) if ping_everyone else None
+        )
+        
         await interaction.response.send_message(
             f"✅ Announcement sent to {channel.mention}!",
             ephemeral=True
         )
     except discord.Forbidden:
+        # Provide detailed permission error
+        error_msg = "❌ Bot lacks permissions in that channel!\n"
+        if ping_everyone:
+            error_msg += "• Need 'Mention Everyone' permission to ping @everyone\n"
+        error_msg += f"• Required: Send Messages, Embed Links"
+        
         await interaction.response.send_message(
-            "❌ I don't have permission to send messages in that channel!",
+            error_msg,
             ephemeral=True
         )
     except Exception as e:
@@ -130,13 +140,11 @@ async def send_message(interaction: discord.Interaction,
         )
     
     try:
-        # Create embed for DM
+        # Create clean embed without attribution
         embed = discord.Embed(
-            title=f"Message from {interaction.guild.name}",
             description=message,
             color=discord.Color.blue()
         )
-        embed.set_footer(text=f"Sent by {interaction.user.display_name}")
         
         # Send DM
         await user.send(embed=embed)
