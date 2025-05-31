@@ -1,10 +1,12 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
+from discord.ui import Modal, TextInput
 import os
 import asyncio
 from datetime import datetime
 import json
+from typing import Optional, List
 
 # Get token from environment
 token = os.getenv("DISCORD_TOKEN")
@@ -63,7 +65,8 @@ async def on_ready():
             view_channel=True,
             read_message_history=True,
             mention_everyone=True,
-            manage_messages=True
+            manage_messages=True,
+            attach_files=True
         ),
         scopes=("bot", "applications.commands")
     )
@@ -195,7 +198,8 @@ async def sync_commands(interaction: discord.Interaction):
             view_channel=True,
             read_message_history=True,
             mention_everyone=True,
-            manage_messages=True
+            manage_messages=True,
+            attach_files=True
         ),
         scopes=("bot", "applications.commands")
     )
@@ -257,17 +261,15 @@ async def sync_commands(interaction: discord.Interaction):
 @bot.tree.command(name="announce", description="Send an announcement to a channel")
 @app_commands.describe(
     channel="Channel to send announcement to",
-    message="Announcement message content",
     ping_everyone="Ping @everyone with this announcement",
-    ping_here="Ping @here with this announcement"  # NEW OPTION ADDED
+    ping_here="Ping @here with this announcement"
 )
 async def announce(interaction: discord.Interaction, 
                   channel: discord.TextChannel, 
-                  message: str,
                   ping_everyone: bool = False,
-                  ping_here: bool = False):  # NEW PARAMETER ADDED
+                  ping_here: bool = False):
     """Send a professional announcement to a specified channel"""
-    # Permission check (unchanged)
+    # Permission check
     if not has_announcement_permission(interaction):
         embed = create_embed(
             title="❌ Permission Denied",
@@ -276,7 +278,99 @@ async def announce(interaction: discord.Interaction,
         )
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     
-    # Create professional announcement embed (unchanged)
+    # Create a modal for message input
+    class AnnouncementModal(Modal, title="Create Announcement"):
+        message = TextInput(
+            label="Announcement Content",
+            style=discord.TextStyle.paragraph,
+            placeholder="Type your announcement here...",
+            required=True,
+            max_length=4000
+        )
+        
+        async def on_submit(self, modal_interaction: discord.Interaction):
+            await modal_interaction.response.defer(thinking=True, ephemeral=True)
+            
+            # Create professional announcement embed
+            embed = create_embed(
+                title=" ",
+                description=self.message.value,
+                color=discord.Color.gold()
+            )
+            
+            if interaction.guild.icon:
+                embed.set_thumbnail(url=interaction.guild.icon.url)
+            
+            # Prepare ping string
+            ping_str = ""
+            if ping_everyone:
+                ping_str += "@everyone "
+            if ping_here:
+                ping_str += "@here "
+            
+            try:
+                # Send announcement
+                await channel.send(
+                    content=ping_str if ping_str else None, 
+                    embed=embed,
+                    allowed_mentions=discord.AllowedMentions(everyone=True) if (ping_everyone or ping_here) else None
+                )
+                
+                embed = create_embed(
+                    title="✅ Announcement Sent",
+                    description=f"Announcement successfully sent to {channel.mention}!",
+                    color=discord.Color.green()
+                )
+                await modal_interaction.followup.send(embed=embed, ephemeral=True)
+            except discord.Forbidden:
+                # Provide detailed permission error
+                error_msg = "❌ Bot lacks permissions in that channel!\n"
+                if ping_everyone or ping_here:
+                    error_msg += "• Need 'Mention Everyone' permission to ping @everyone/@here\n"
+                error_msg += "• Required: Send Messages, Embed Links"
+                
+                embed = create_embed(
+                    title="❌ Permission Error",
+                    description=error_msg,
+                    color=discord.Color.red()
+                )
+                await modal_interaction.followup.send(embed=embed, ephemeral=True)
+            except Exception as e:
+                embed = create_embed(
+                    title="❌ Announcement Failed",
+                    description=f"Error: {e}",
+                    color=discord.Color.red()
+                )
+                await modal_interaction.followup.send(embed=embed, ephemeral=True)
+
+    # Send the modal to the user
+    await interaction.response.send_modal(AnnouncementModal())
+
+@bot.tree.command(name="attach-announce", description="Send an announcement with attachments")
+@app_commands.describe(
+    channel="Channel to send announcement to",
+    ping_everyone="Ping @everyone with this announcement",
+    ping_here="Ping @here with this announcement",
+    message="Announcement message content",
+    attachments="Attach files to your announcement"
+)
+async def attach_announce(interaction: discord.Interaction, 
+                          channel: discord.TextChannel, 
+                          message: str,
+                          ping_everyone: bool = False,
+                          ping_here: bool = False,
+                          attachments: Optional[List[discord.Attachment]] = None):
+    """Send an announcement with attachments"""
+    # Permission check
+    if not has_announcement_permission(interaction):
+        embed = create_embed(
+            title="❌ Permission Denied",
+            description="You need the Announcement role or 'Manage Messages' permission!",
+            color=discord.Color.red()
+        )
+        return await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+    # Create professional announcement embed
     embed = create_embed(
         title=" ",
         description=message,
@@ -287,32 +381,39 @@ async def announce(interaction: discord.Interaction,
         embed.set_thumbnail(url=interaction.guild.icon.url)
     
     try:
-        # Prepare ping string - MODIFIED TO INCLUDE @HERE
+        # Prepare ping string
         ping_str = ""
         if ping_everyone:
             ping_str += "@everyone "
         if ping_here:
             ping_str += "@here "
         
-        # Send announcement - MODIFIED ALLOWED MENTIONS
+        # Process attachments
+        files = []
+        if attachments:
+            for attachment in attachments:
+                files.append(await attachment.to_file())
+        
+        # Send announcement with attachments
         await channel.send(
-            content=f"{ping_str}\n" if ping_str else None, 
+            content=ping_str if ping_str else None, 
             embed=embed,
+            files=files,
             allowed_mentions=discord.AllowedMentions(everyone=True) if (ping_everyone or ping_here) else None
         )
         
         embed = create_embed(
             title="✅ Announcement Sent",
-            description=f"Announcement successfully sent to {channel.mention}!",
+            description=f"Announcement with {len(files)} attachment(s) sent to {channel.mention}!",
             color=discord.Color.green()
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
     except discord.Forbidden:
-        # Provide detailed permission error - UPDATED MESSAGE
+        # Provide detailed permission error
         error_msg = "❌ Bot lacks permissions in that channel!\n"
         if ping_everyone or ping_here:
             error_msg += "• Need 'Mention Everyone' permission to ping @everyone/@here\n"
-        error_msg += "• Required: Send Messages, Embed Links"
+        error_msg += "• Required: Send Messages, Embed Links, Attach Files"
         
         embed = create_embed(
             title="❌ Permission Error",
