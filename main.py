@@ -258,14 +258,16 @@ async def sync_commands(interaction: discord.Interaction):
 @app_commands.describe(
     channel="Channel to send announcement to",
     message="Announcement message content",
-    ping_everyone="Ping @everyone with this announcement"
+    ping_everyone="Ping @everyone with this announcement",
+    ping_here="Ping @here with this announcement"  # NEW OPTION ADDED
 )
 async def announce(interaction: discord.Interaction, 
                   channel: discord.TextChannel, 
                   message: str,
-                  ping_everyone: bool = False):
+                  ping_everyone: bool = False,
+                  ping_here: bool = False):  # NEW PARAMETER ADDED
     """Send a professional announcement to a specified channel"""
-    # Permission check
+    # Permission check (unchanged)
     if not has_announcement_permission(interaction):
         embed = create_embed(
             title="❌ Permission Denied",
@@ -274,7 +276,7 @@ async def announce(interaction: discord.Interaction,
         )
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     
-    # Create professional announcement embed
+    # Create professional announcement embed (unchanged)
     embed = create_embed(
         title=" ",
         description=message,
@@ -285,14 +287,18 @@ async def announce(interaction: discord.Interaction,
         embed.set_thumbnail(url=interaction.guild.icon.url)
     
     try:
-        # Prepare ping string
-        ping_str = "@everyone @here " if ping_everyone else ""
+        # Prepare ping string - MODIFIED TO INCLUDE @HERE
+        ping_str = ""
+        if ping_everyone:
+            ping_str += "@everyone "
+        if ping_here:
+            ping_str += "@here "
         
-        # Send announcement
+        # Send announcement - MODIFIED ALLOWED MENTIONS
         await channel.send(
-            content=f"{ping_str}\n", 
+            content=f"{ping_str}\n" if ping_str else None, 
             embed=embed,
-            allowed_mentions=discord.AllowedMentions(everyone=True) if ping_everyone else None
+            allowed_mentions=discord.AllowedMentions(everyone=True) if (ping_everyone or ping_here) else None
         )
         
         embed = create_embed(
@@ -302,10 +308,10 @@ async def announce(interaction: discord.Interaction,
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
     except discord.Forbidden:
-        # Provide detailed permission error
+        # Provide detailed permission error - UPDATED MESSAGE
         error_msg = "❌ Bot lacks permissions in that channel!\n"
-        if ping_everyone:
-            error_msg += "• Need 'Mention Everyone' permission to ping @everyone\n"
+        if ping_everyone or ping_here:
+            error_msg += "• Need 'Mention Everyone' permission to ping @everyone/@here\n"
         error_msg += "• Required: Send Messages, Embed Links"
         
         embed = create_embed(
