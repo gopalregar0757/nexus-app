@@ -286,7 +286,7 @@ async def announce(interaction: discord.Interaction,
     
     try:
         # Prepare ping string
-        ping_str = "@everyone " if ping_everyone else ""
+        ping_str = "@everyone @here " if ping_everyone else ""
         
         # Send announcement
         await channel.send(
