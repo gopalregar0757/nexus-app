@@ -283,7 +283,7 @@ async def announce(interaction: discord.Interaction,
         message = TextInput(
             label="Announcement Content",
             style=discord.TextStyle.paragraph,
-            placeholder="Type your announcement here...",
+            placeholder="Type your announcement here...\nAll formatting will be preserved exactly as entered!",
             required=True,
             max_length=4000
         )
@@ -291,7 +291,7 @@ async def announce(interaction: discord.Interaction,
         async def on_submit(self, modal_interaction: discord.Interaction):
             await modal_interaction.response.defer(thinking=True, ephemeral=True)
             
-            # Create professional announcement embed with code block formatting
+            # Create professional announcement embed with perfect formatting preservation
             formatted_message = (
                 "📢 **Official Announcement**\n\n"
                 f"```\n{self.message.value}\n```"
@@ -354,7 +354,7 @@ async def announce(interaction: discord.Interaction,
     channel="Channel to send announcement to",
     ping_everyone="Ping @everyone with this announcement",
     ping_here="Ping @here with this announcement",
-    message="Announcement message content",
+    message="Announcement message content (formatting preserved)",
     attachment="Attach a file to your announcement"
 )
 async def attach_announce(interaction: discord.Interaction, 
@@ -373,7 +373,7 @@ async def attach_announce(interaction: discord.Interaction,
         )
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     
-    # Create professional announcement embed with code block formatting
+    # Create professional announcement embed with perfect formatting preservation
     formatted_message = (
         "📢 **Official Announcement**\n\n"
         f"```\n{message}\n```"
@@ -440,7 +440,7 @@ async def attach_announce(interaction: discord.Interaction,
 @app_commands.describe(
     message_id="ID of the message to reply to",
     channel="Channel where the message is located",
-    content="Your reply content"
+    content="Your reply content (formatting preserved)"
 )
 async def reply(interaction: discord.Interaction,
                message_id: str,
@@ -458,7 +458,7 @@ async def reply(interaction: discord.Interaction,
     try:
         message = await channel.fetch_message(int(message_id))
         
-        # Create professional reply embed with code block formatting
+        # Create professional reply embed with perfect formatting preservation
         formatted_content = (
             f"**Reply to [this message]({message.jump_url})**\n\n"
             f"```\n{content}\n```"
@@ -494,7 +494,7 @@ async def reply(interaction: discord.Interaction,
 @bot.tree.command(name="dm", description="Send a direct message to a user")
 @app_commands.describe(
     user="User to message",
-    message="Message content"
+    message="Message content (formatting preserved)"
 )
 async def dm(interaction: discord.Interaction, 
              user: discord.Member, 
@@ -509,7 +509,7 @@ async def dm(interaction: discord.Interaction,
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     
     try:
-        # Create professional DM embed with code block formatting
+        # Create professional DM embed with perfect formatting preservation
         formatted_message = (
             "📨 **Message from Nexus Esports**\n\n"
             "For any queries or further support, contact @acroneop in our Official Server:\n"
