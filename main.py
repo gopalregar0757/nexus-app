@@ -108,12 +108,12 @@ async def on_message(message):
     # Process commands (important for command functionality)
     await bot.process_commands(message)
 
-def create_embed(title: str = None, description: str = None, color: discord.Color = discord.Color.blue()) -> discord.Embed:
+def create_embed(title: str = None, description: str = None, color: discord.Color = discord.Color(0x3e0000)) -> discord.Embed:
     """Helper function to create consistent embeds"""
     embed = discord.Embed(
         title=title,
         description=description,
-        color=color,
+        color=color,  # Now uses #3e0000 as default
         timestamp=datetime.utcnow()
     )
     embed.set_footer(text="Nexus Esports Official | Dm Moderators or Officials for any Query!")
@@ -150,7 +150,7 @@ async def set_announce_role(interaction: discord.Interaction, role: discord.Role
         embed = create_embed(
             title="❌ Permission Denied",
             description="You need 'Manage Server' permission to set announcement roles.",
-            color=color=discord.Color(0x3e0000)
+            color=discord.Color(0x3e0000)
         )
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     
@@ -183,7 +183,7 @@ async def sync_commands(interaction: discord.Interaction):
         embed = create_embed(
             title="❌ Permission Denied",
             description="Only server owners or bot owners can sync commands.",
-            color=color=discord.Color(0x3e0000)
+            color=discord.Color(0x3e0000)
         )
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     
@@ -233,7 +233,7 @@ async def sync_commands(interaction: discord.Interaction):
         embed = create_embed(
             title="❌ Sync Failed - Permissions Issue",
             description=description,
-            color=color=discord.Color(0x3e0000)
+            color=discord.Color(0x3e0000)
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
     except Exception as e:
@@ -252,7 +252,7 @@ async def sync_commands(interaction: discord.Interaction):
         embed = create_embed(
             title="❌ Sync Failed",
             description=description,
-            color=color=discord.Color(0x3e0000)
+            color=discord.Color(0x3e0000)
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -274,7 +274,7 @@ async def announce_simple(interaction: discord.Interaction,
         embed = create_embed(
             title="❌ Permission Denied",
             description="You need the Announcement role or 'Manage Messages' permission!",
-            color=color=discord.Color(0x3e0000)
+            color=discord.Color(0x3e0000)
         )
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     
@@ -316,7 +316,7 @@ async def announce_simple(interaction: discord.Interaction,
         embed = create_embed(
             title="❌ Announcement Failed",
             description=f"Error: {e}",
-            color=color=discord.Color(0x3e0000)
+            color=discord.Color(0x3e0000)
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -339,7 +339,7 @@ async def announce_attachment(interaction: discord.Interaction,
         embed = create_embed(
             title="❌ Permission Denied",
             description="You need the Announcement role or 'Manage Messages' permission!",
-            color=color=discord.Color(0x3e0000)
+            color=discord.Color(0x3e0000)
         )
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     
@@ -385,7 +385,7 @@ async def announce_attachment(interaction: discord.Interaction,
         embed = create_embed(
             title="❌ Announcement Failed",
             description=f"Error: {e}",
-            color=color=discord.Color(0x3e0000)
+            color=discord.Color(0x3e0000)
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -406,7 +406,7 @@ async def announce_only_attachment(interaction: discord.Interaction,
         embed = create_embed(
             title="❌ Permission Denied",
             description="You need the Announcement role or 'Manage Messages' permission!",
-            color=color=discord.Color(0x3e0000)
+            color=discord.Color(0x3e0000)
         )
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     
@@ -438,7 +438,7 @@ async def announce_only_attachment(interaction: discord.Interaction,
         embed = create_embed(
             title="❌ Announcement Failed",
             description=f"Error: {e}",
-            color=color=discord.Color(0x3e0000)
+            color=discord.Color(0x3e0000)
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -458,7 +458,7 @@ async def set_welcome(interaction: discord.Interaction,
         embed = create_embed(
             title="❌ Permission Denied",
             description="You need 'Manage Server' permission to configure welcome messages.",
-            color=color=discord.Color(0x3e0000)
+            color=discord.Color(0x3e0000)
         )
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     
@@ -519,7 +519,7 @@ async def on_member_join(member: discord.Member):
                         f"Bro {member.mention},\n\n"  # Mention outside the code block
                         f"```\n{welcome_text}\n```"   # Instructions inside code block
                     ),
-                    color=color=discord.Color(0x3e0000)
+                    color=discord.Color(0x3e0000)
                 )
                 # Set new GIF
                 embed.set_image(url="https://cdn.discordapp.com/attachments/1378018158010695722/1378426905585520901/standard_2.gif")
@@ -540,7 +540,7 @@ async def on_member_join(member: discord.Member):
             # Use configured DM
             embed = discord.Embed(
                 description=welcome_dm,
-                color=color=discord.Color(0x3e0000),
+                color=discord.Color(0x3e0000),
                 timestamp=datetime.utcnow()
             )
             embed.set_footer(text="Nexus Esports Official | DM Moderators or Officials for any Query!")
@@ -574,7 +574,7 @@ async def on_member_join(member: discord.Member):
             # Create professional DM embed (red theme)
             embed = discord.Embed(
                 description=dm_message,
-                color=color=discord.Color(0x3e0000),
+                color=discord.Color(0x3e0000),
                 timestamp=datetime.utcnow()
             )
             embed.set_footer(text="Nexus Esports Official | DM Moderators or Officials for any Query!")
