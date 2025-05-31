@@ -3,6 +3,7 @@ from discord import app_commands
 from discord.ext import commands
 import os
 import asyncio
+from datetime import datetime
 
 # Get token from environment
 token = os.getenv("DISCORD_TOKEN")
@@ -39,6 +40,17 @@ async def on_ready():
         except Exception as e:
             print(f"❌ Command sync failed: {e}")
 
+def create_embed(title: str = None, description: str = None, color: discord.Color = discord.Color.blue()) -> discord.Embed:
+    """Helper function to create consistent embeds"""
+    embed = discord.Embed(
+        title=title,
+        description=description,
+        color=color,
+        timestamp=datetime.utcnow()
+    )
+    embed.set_footer(text="Nexus Esports • Professional Communication")
+    return embed
+
 def has_announcement_permission(interaction: discord.Interaction) -> bool:
     """Check if user has announcement permissions through role or manage_messages"""
     # Check if user has manage_messages permission
@@ -54,43 +66,56 @@ def has_announcement_permission(interaction: discord.Interaction) -> bool:
 @bot.tree.command(name="sync-cmds", description="Force sync commands (Owner only)")
 async def sync_cmds(interaction: discord.Interaction):
     if interaction.user.id != (await bot.application_info()).owner.id:
-        return await interaction.response.send_message("❌ Owner only command!", ephemeral=True)
+        embed = create_embed(
+            title="❌ Access Denied",
+            description="This command is restricted to the bot owner only.",
+            color=discord.Color.red()
+        )
+        return await interaction.response.send_message(embed=embed, ephemeral=True)
     
     try:
         synced = await bot.tree.sync()
-        await interaction.response.send_message(
-            f"✅ Synced {len(synced)} commands globally!",
-            ephemeral=True
+        embed = create_embed(
+            title="✅ Success",
+            description=f"Synced {len(synced)} commands globally!",
+            color=discord.Color.green()
         )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
     except Exception as e:
-        await interaction.response.send_message(
-            f"❌ Sync failed: {e}",
-            ephemeral=True
+        embed = create_embed(
+            title="❌ Sync Failed",
+            description=f"Error: {e}",
+            color=discord.Color.red()
         )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
-@bot.tree.command(name="send-announce", description="Send an announcement to a channel")
+@bot.tree.command(name="announce", description="Send an announcement to a channel")
 @app_commands.describe(
     channel="Channel to send announcement to",
     message="Announcement message content",
     ping_everyone="Ping @everyone with this announcement"
 )
-async def send_announce(interaction: discord.Interaction, 
-                        channel: discord.TextChannel, 
-                        message: str,
-                        ping_everyone: bool = False):
+async def announce(interaction: discord.Interaction, 
+                  channel: discord.TextChannel, 
+                  message: str,
+                  ping_everyone: bool = False):
+    """Send a professional announcement to a specified channel"""
     # Permission check
     if not has_announcement_permission(interaction):
-        return await interaction.response.send_message(
-            "❌ You need the Announcement role or 'Manage Messages' permission!",
-            ephemeral=True
+        embed = create_embed(
+            title="❌ Permission Denied",
+            description="You need the Announcement role or 'Manage Messages' permission!",
+            color=discord.Color.red()
         )
+        return await interaction.response.send_message(embed=embed, ephemeral=True)
     
-    # Create clean embed without attribution
-    embed = discord.Embed(
-        title="📢 Announcement",
+    # Create professional announcement embed
+    embed = create_embed(
+        title="📢 Official Announcement",
         description=message,
         color=discord.Color.gold()
     )
+    embed.set_thumbnail(url=interaction.guild.icon.url if interaction.guild.icon else None)
     
     try:
         # Prepare ping string
@@ -103,69 +128,148 @@ async def send_announce(interaction: discord.Interaction,
             allowed_mentions=discord.AllowedMentions(everyone=True) if ping_everyone else None
         )
         
-        await interaction.response.send_message(
-            f"✅ Announcement sent to {channel.mention}!",
-            ephemeral=True
+        embed = create_embed(
+            title="✅ Announcement Sent",
+            description=f"Announcement successfully sent to {channel.mention}!",
+            color=discord.Color.green()
         )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
     except discord.Forbidden:
         # Provide detailed permission error
         error_msg = "❌ Bot lacks permissions in that channel!\n"
         if ping_everyone:
             error_msg += "• Need 'Mention Everyone' permission to ping @everyone\n"
-        error_msg += f"• Required: Send Messages, Embed Links"
+        error_msg += "• Required: Send Messages, Embed Links"
         
-        await interaction.response.send_message(
-            error_msg,
-            ephemeral=True
+        embed = create_embed(
+            title="❌ Permission Error",
+            description=error_msg,
+            color=discord.Color.red()
         )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
     except Exception as e:
-        await interaction.response.send_message(
-            f"❌ Failed to send announcement: {e}",
-            ephemeral=True
+        embed = create_embed(
+            title="❌ Announcement Failed",
+            description=f"Error: {e}",
+            color=discord.Color.red()
         )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
-@bot.tree.command(name="send-message", description="Send a direct message to a user")
+@bot.tree.command(name="reply", description="Reply to a message in a channel")
+@app_commands.describe(
+    message_id="ID of the message to reply to",
+    channel="Channel where the message is located",
+    content="Your reply content"
+)
+async def reply(interaction: discord.Interaction,
+               message_id: str,
+               channel: discord.TextChannel,
+               content: str):
+    """Reply to a specific message in a channel"""
+    if not has_announcement_permission(interaction):
+        embed = create_embed(
+            title="❌ Permission Denied",
+            description="You need the Announcement role or 'Manage Messages' permission!",
+            color=discord.Color.red()
+        )
+        return await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+    try:
+        message = await channel.fetch_message(int(message_id))
+        
+        # Create professional reply embed
+        embed = create_embed(
+            description=f"*Reply to [this message]({message.jump_url})*\n\n{content}",
+            color=discord.Color.blue()
+        )
+        embed.set_author(
+            name=f"Reply from {interaction.user.display_name}",
+            icon_url=interaction.user.display_avatar.url
+        )
+        
+        await channel.send(embed=embed)
+        
+        embed = create_embed(
+            title="✅ Reply Sent",
+            description=f"Your reply was successfully sent to {channel.mention}!",
+            color=discord.Color.green()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    except discord.NotFound:
+        embed = create_embed(
+            title="❌ Message Not Found",
+            description="Could not find the specified message in that channel.",
+            color=discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    except Exception as e:
+        embed = create_embed(
+            title="❌ Reply Failed",
+            description=f"Error: {e}",
+            color=discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+@bot.tree.command(name="dm", description="Send a direct message to a user")
 @app_commands.describe(
     user="User to message",
     message="Message content"
 )
-async def send_message(interaction: discord.Interaction, 
-                       user: discord.Member, 
-                       message: str):
-    # Permission check
+async def dm(interaction: discord.Interaction, 
+             user: discord.Member, 
+             message: str):
+    """Send a professional direct message to a user"""
     if not has_announcement_permission(interaction):
-        return await interaction.response.send_message(
-            "❌ You need the Announcement role or 'Manage Messages' permission!",
-            ephemeral=True
+        embed = create_embed(
+            title="❌ Permission Denied",
+            description="You need the Announcement role or 'Manage Messages' permission!",
+            color=discord.Color.red()
         )
+        return await interaction.response.send_message(embed=embed, ephemeral=True)
     
     try:
-        # Create clean embed without attribution
-        embed = discord.Embed(
+        # Create professional DM embed
+        embed = create_embed(
+            title="📩 Message from Nexus Esports",
             description=message,
             color=discord.Color.blue()
         )
+        embed.set_thumbnail(url=interaction.guild.icon.url if interaction.guild.icon else None)
         
         # Send DM
         await user.send(embed=embed)
-        await interaction.response.send_message(
-            f"✅ Message sent to {user.mention}!",
-            ephemeral=True
+        
+        embed = create_embed(
+            title="✅ Message Delivered",
+            description=f"Message successfully sent to {user.mention}!",
+            color=discord.Color.green()
         )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
     except discord.Forbidden:
-        await interaction.response.send_message(
-            "❌ User has DMs disabled or blocked me!",
-            ephemeral=True
+        embed = create_embed(
+            title="❌ Delivery Failed",
+            description="User has DMs disabled or has blocked the bot.",
+            color=discord.Color.red()
         )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
     except Exception as e:
-        await interaction.response.send_message(
-            f"❌ Failed to send message: {e}",
-            ephemeral=True
+        embed = create_embed(
+            title="❌ Error Sending Message",
+            description=f"Error: {e}",
+            color=discord.Color.red()
         )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
 
 @bot.tree.command(name="ping", description="Test bot responsiveness")
 async def ping(interaction: discord.Interaction):
-    await interaction.response.send_message("🏓 Pong!")
+    """Simple ping command with latency check"""
+    latency = round(bot.latency * 1000)
+    embed = create_embed(
+        title="🏓 Pong!",
+        description=f"Bot latency: {latency}ms",
+        color=discord.Color.green()
+    )
+    await interaction.response.send_message(embed=embed)
 
 @bot.tree.command(name="my-permissions", description="Check your announcement permissions")
 async def check_perms(interaction: discord.Interaction):
@@ -176,15 +280,21 @@ async def check_perms(interaction: discord.Interaction):
     # Get user's roles
     roles = ", ".join([role.name for role in interaction.user.roles]) or "No roles"
     
-    response = (
+    description = (
         f"{perm_status}\n\n"
-        f"**Your roles:** {roles}\n"
-        f"**Announcement role ID:** {ANNOUNCEMENT_ROLE_ID or 'Not set'}\n"
-        f"**Manage Messages permission:** {interaction.user.guild_permissions.manage_messages}\n\n"
+        f"*Your roles:* {roles}\n"
+        f"*Announcement role ID:* {ANNOUNCEMENT_ROLE_ID or 'Not set'}\n"
+        f"*Manage Messages permission:* {interaction.user.guild_permissions.manage_messages}\n\n"
         f"Contact server admins if you should have access."
     )
     
-    await interaction.response.send_message(response, ephemeral=True)
+    embed = create_embed(
+        title="🔑 Your Permissions",
+        description=description,
+        color=discord.Color.blue()
+    )
+    
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 try:
     bot.run(token)
@@ -198,4 +308,4 @@ except discord.PrivilegedIntentsRequired:
 except discord.LoginFailure:
     print("❌ Invalid token. Check your DISCORD_TOKEN")
 except Exception as e:
-    print(f"❌ Unexpected error: {e}")
+    print(f"❌ Unexpected error: {e}")
