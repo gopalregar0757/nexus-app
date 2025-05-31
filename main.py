@@ -442,6 +442,105 @@ async def announce_only_attachment(interaction: discord.Interaction,
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
+@bot.tree.command(name="dm-user", description="Send a DM to a specific user (Mods only)")
+@app_commands.describe(
+    user="The user to DM",
+    message="The message to send",
+    attachment="(Optional) File to attach"
+)
+async def dm_user(
+    interaction: discord.Interaction,
+    user: discord.User,
+    message: str,
+    attachment: Optional[discord.Attachment] = None
+):
+    """Send a direct message to a user"""
+    # Check permissions
+    if not interaction.user.guild_permissions.manage_messages:
+        embed = create_embed(
+            title="❌ Permission Denied",
+            description="You need 'Manage Messages' permission to use this command.",
+            color=discord.Color.red()
+        )
+        return await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+    try:
+        # Create the embed
+        embed = discord.Embed(
+            title=f"Message from {interaction.guild.name}",
+            description=message,
+            color=discord.Color(0x3e0000),
+            timestamp=datetime.utcnow()
+        )
+        embed.set_footer(text=f"Sent by {interaction.user.display_name}")
+        
+        # If there's an attachment
+        files = []
+        if attachment:
+            file = await attachment.to_file()
+            files.append(file)
+            embed.set_image(url=f"attachment://{file.filename}")
+        
+        # Send the DM
+        await user.send(embed=embed, files=files)
+        
+        # Confirm to the moderator
+        embed = create_embed(
+            title="✅ DM Sent",
+            description=f"Message sent to {user.mention}",
+            color=discord.Color.green()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        
+    except discord.Forbidden:
+        embed = create_embed(
+            title="❌ Failed to Send DM",
+            description="This user has DMs disabled or blocked the bot.",
+            color=discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    except Exception as e:
+        embed = create_embed(
+            title="❌ Error",
+            description=f"An error occurred: {str(e)}",
+            color=discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+@bot.tree.context_menu(name="Reply to User")
+async def reply_to_user(interaction: discord.Interaction, message: discord.Message):
+    """Reply to a user's message with a mention"""
+    # Check permissions
+    if not interaction.user.guild_permissions.manage_messages:
+        embed = create_embed(
+            title="❌ Permission Denied",
+            description="You need 'Manage Messages' permission to use this command.",
+            color=discord.Color.red()
+        )
+        return await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+    # Create a modal for the reply
+    class ReplyModal(discord.ui.Modal, title="Reply to User"):
+        reply_content = discord.ui.TextInput(
+            label="Your reply",
+            style=discord.TextStyle.paragraph,
+            placeholder="Type your reply here...",
+            required=True
+        )
+        
+        async def on_submit(self, interaction: discord.Interaction):
+            # Send the reply mentioning the original author
+            await interaction.channel.send(
+                f"{message.author.mention}, {interaction.user.mention} replies:\n{self.reply_content}",
+                allowed_mentions=discord.AllowedMentions(users=True)
+            )
+            await interaction.response.send_message(
+                "✅ Reply sent!",
+                ephemeral=True
+            )
+    
+    await interaction.response.send_modal(ReplyModal())
+
+
 # Welcome System - UPDATED
 @bot.tree.command(name="set-welcome", description="Configure welcome messages (Admin only)")
 @app_commands.describe(
