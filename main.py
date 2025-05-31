@@ -465,8 +465,12 @@ async def dm_user(
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     
     try:
-        # Create the base message
-        base_message = f"**Message from {interaction.guild.name}:**\n{message}"
+        # Create the base message with server link
+        base_message = (
+            f"**Message from {interaction.guild.name}:**\n{message}\n\n"
+            "For any queries or further support, contact @acroneop in our Official Server:\n"
+            "https://discord.gg/xPGJCWpMbM"
+        )
         
         # Add attachment notice if there's an attachment
         if attachment:
@@ -505,6 +509,13 @@ async def dm_user(
         embed = create_embed(
             title="❌ Failed to Send DM",
             description="This user has DMs disabled or blocked the bot.",
+            color=discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    except Exception as e:
+        embed = create_embed(
+            title="❌ Error",
+            description=f"An error occurred: {str(e)}",
             color=discord.Color.red()
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
