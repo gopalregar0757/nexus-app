@@ -1,12 +1,10 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
-from discord.ui import Modal, TextInput
 import os
-import asyncio
-from datetime import datetime
 import json
-from typing import Optional, List
+from datetime import datetime
+from typing import Optional
 
 # Get token from environment
 token = os.getenv("DISCORD_TOKEN")
@@ -444,15 +442,17 @@ async def announce_only_attachment(interaction: discord.Interaction,
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-# Welcome System
+# Welcome System - UPDATED
 @bot.tree.command(name="set-welcome", description="Configure welcome messages (Admin only)")
 @app_commands.describe(
     welcome_channel="Channel to send welcome messages",
-    dm_message="Message to send in DMs when someone joins"
+    dm_message="Message to send in DMs when someone joins",
+    dm_attachment_url="(Optional) URL of an image to include in the DM welcome"
 )
 async def set_welcome(interaction: discord.Interaction, 
                       welcome_channel: discord.TextChannel, 
-                      dm_message: str):
+                      dm_message: str,
+                      dm_attachment_url: Optional[str] = None):
     """Set welcome channel and DM message"""
     if not interaction.user.guild_permissions.manage_guild:
         embed = create_embed(
@@ -471,14 +471,21 @@ async def set_welcome(interaction: discord.Interaction,
     # Save welcome settings
     guild_configs[guild_id]["welcome_channel"] = welcome_channel.id
     guild_configs[guild_id]["welcome_dm"] = dm_message
+    if dm_attachment_url:
+        guild_configs[guild_id]["dm_attachment_url"] = dm_attachment_url
     save_config()
+    
+    # Build confirmation message
+    conf_msg = (
+        f"Welcome messages will be sent to {welcome_channel.mention}\n"
+        f"DM message set to: ```\n{dm_message}\n```"
+    )
+    if dm_attachment_url:
+        conf_msg += f"\nDM attachment URL set to: {dm_attachment_url[:50]}..."
     
     embed = create_embed(
         title="✅ Welcome System Configured",
-        description=(
-            f"Welcome messages will be sent to {welcome_channel.mention}\n"
-            f"DM message set to: ```\n{dm_message}\n```"
-        ),
+        description=conf_msg,
         color=discord.Color.green()
     )
     await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -493,41 +500,76 @@ async def on_member_join(member: discord.Member):
         return
     
     welcome_channel_id = guild_configs[guild_id].get("welcome_channel")
-    welcome_dm = guild_configs[guild_id].get("welcome_dm")
     
-    # Send channel welcome
+    # Send channel welcome (using embed for cleaner box design)
     if welcome_channel_id:
         try:
             channel = member.guild.get_channel(welcome_channel_id)
             if channel:
-                # Create welcome message with GIF
+                # Create red-themed embed with proper box design
                 welcome_text = (
-                    f"Bro {member.mention}, first click on Nexus Esports above and select 'Show All Channels' "
-                    "so that all channels become visible to you. And one more thing...\n"
+                    f"Bro {member.mention}, first click on Nexus Esports\n"
+                    "above and select 'Show All Channels' so that\n"
+                    "all channels become visible to you.\n\n"
                     "💕 Welcome to Nexus Esports 💕"
                 )
                 
-                # Create embed with GIF
-                embed = discord.Embed(color=discord.Color.blue())
-                embed.set_image(url="https://cdn.discordapp.com/attachments/1378018158010695722/1378421143358275675/standard_1.gif")
+                embed = discord.Embed(
+                    description=f"```\n{welcome_text}\n```",
+                    color=discord.Color.red()
+                )
+                # Set new GIF
+                embed.set_image(url="https://cdn.discordapp.com/attachments/1378018158010695722/1378426905585520901/standard_2.gif")
                 
-                await channel.send(content=welcome_text, embed=embed)
+                await channel.send(embed=embed)
         except Exception as e:
             print(f"⚠️ Error sending channel welcome: {e}")
     
-    # Send DM welcome
-    if welcome_dm:
-        try:
-            # Create professional DM embed
-            formatted_message = (
-                "📨 **Welcome to Nexus Esports!**\n\n"
-                f"```\n{welcome_dm}\n```\n"
-                "For any queries or further support, contact @acroneop in our Official Server:\n"
-                "https://discord.gg/xPGJCWpMbM"
-            )
+    # Send DM welcome (configured or fixed)
+    try:
+        # Get configured DM settings
+        welcome_dm = guild_configs[guild_id].get("welcome_dm")
+        dm_attachment_url = guild_configs[guild_id].get("dm_attachment_url")
+        
+        if welcome_dm:
+            # Use configured DM
             embed = discord.Embed(
-                description=formatted_message,
-                color=discord.Color.blue(),
+                description=welcome_dm,
+                color=discord.Color.red(),
+                timestamp=datetime.utcnow()
+            )
+            embed.set_footer(text="Nexus Esports Official | DM Moderators or Officials for any Query!")
+            
+            # Add attachment if provided
+            if dm_attachment_url:
+                embed.set_image(url=dm_attachment_url)
+            
+            if member.guild.icon:
+                embed.set_thumbnail(url=member.guild.icon.url)
+            
+            await member.send(embed=embed)
+        else:
+            # Fallback to fixed DM
+            dm_message = (
+                "🌟 Welcome to Nexus Esports! 🌟\n\n"
+                "Thank you for joining our gaming community! We're excited to have you on board.\n\n"
+                "As mentioned in our welcome channel:\n"
+                "1. Click \"Nexus Esports\" at the top of the server\n"
+                "2. Select \"Show All Channels\" to access everything\n"
+                "3. Explore our community spaces!\n\n"
+                "Quick Start:\n"
+                "• Read #rules for guidelines\n"
+                "• Introduce yourself in #introductions\n"
+                "• Check #announcements for news\n"
+                "• Join tournaments in #events\n\n"
+                "Need help? Contact @acroneop or our mod team anytime!\n\n"
+                "We're glad you're here! 🎮"
+            )
+            
+            # Create professional DM embed (red theme)
+            embed = discord.Embed(
+                description=dm_message,
+                color=discord.Color.red(),
                 timestamp=datetime.utcnow()
             )
             embed.set_footer(text="Nexus Esports Official | DM Moderators or Officials for any Query!")
@@ -536,11 +578,11 @@ async def on_member_join(member: discord.Member):
                 embed.set_thumbnail(url=member.guild.icon.url)
             
             await member.send(embed=embed)
-        except discord.Forbidden:
-            # User has DMs disabled
-            pass
-        except Exception as e:
-            print(f"⚠️ Error sending welcome DM: {e}")
+    except discord.Forbidden:
+        # User has DMs disabled
+        pass
+    except Exception as e:
+        print(f"⚠️ Error sending welcome DM: {e}")
 
 # Other commands remain the same
 @bot.tree.command(name="ping", description="Test bot responsiveness")
