@@ -7,6 +7,8 @@ intents.message_content = True  # REQUIRED for commands
 
 bot = commands.Bot(command_prefix='!', intents=intents)
 
+print("Token is:", os.getenv("DISCORD_TOKEN"))
+
 @bot.event
 async def on_ready():
     print(f"✅ Bot is ready! Logged in as {bot.user}")
