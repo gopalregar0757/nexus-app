@@ -4,6 +4,7 @@ from discord.ext import commands
 import os
 import asyncio
 from datetime import datetime
+import json
 
 # Get token from environment
 token = os.getenv("DISCORD_TOKEN")
@@ -24,13 +25,48 @@ bot = commands.Bot(
 # Global command sync flag
 commands_synced = False
 
-# Add your announcement role ID here (or set via environment variable)
-ANNOUNCEMENT_ROLE_ID = int(os.getenv("ANNOUNCEMENT_ROLE_ID", 0))  # Default to 0 if not set
+# Configuration storage
+CONFIG_FILE = "bot_config.json"
+guild_configs = {}
+
+def load_config():
+    global guild_configs
+    try:
+        if os.path.exists(CONFIG_FILE):
+            with open(CONFIG_FILE, 'r') as f:
+                guild_configs = json.load(f)
+    except Exception as e:
+        print(f"⚠️ Error loading config: {e}")
+        guild_configs = {}
+
+def save_config():
+    try:
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(guild_configs, f, indent=2)
+    except Exception as e:
+        print(f"⚠️ Error saving config: {e}")
+
+# Load config on startup
+load_config()
 
 @bot.event
 async def on_ready():
     global commands_synced
     print(f"✅ Bot ready! Logged in as {bot.user}")
+    
+    # Print invite link
+    invite_url = discord.utils.oauth_url(
+        bot.user.id,
+        permissions=discord.Permissions(
+            send_messages=True,
+            embed_links=True,
+            view_channel=True,
+            read_message_history=True,
+            mention_everyone=True
+        ),
+        scopes=("bot", "applications.commands")
+    )
+    print(f"\n🔗 Add bot to other servers using this link:\n{invite_url}\n")
     
     if not commands_synced:
         try:
@@ -48,20 +84,56 @@ def create_embed(title: str = None, description: str = None, color: discord.Colo
         color=color,
         timestamp=datetime.utcnow()
     )
-    embed.set_footer(text="Nexus Esports • Professional Communication")
+    embed.set_footer(text="Nexus Esports")
     return embed
 
 def has_announcement_permission(interaction: discord.Interaction) -> bool:
     """Check if user has announcement permissions through role or manage_messages"""
+    if not interaction.guild:
+        return False
+    
+    guild_id = str(interaction.guild.id)
+    
     # Check if user has manage_messages permission
     if interaction.user.guild_permissions.manage_messages:
         return True
     
     # Check if user has announcement role
-    if ANNOUNCEMENT_ROLE_ID:
-        return any(role.id == ANNOUNCEMENT_ROLE_ID for role in interaction.user.roles)
+    if guild_id in guild_configs:
+        role_id = guild_configs[guild_id].get("announcement_role")
+        if role_id:
+            return any(role.id == role_id for role in interaction.user.roles)
     
     return False
+
+@bot.tree.command(name="set-announce-role", description="Set announcement role for this server (Admin only)")
+@app_commands.describe(role="Role to use for announcement permissions")
+async def set_announce_role(interaction: discord.Interaction, role: discord.Role):
+    """Set the announcement role for the current server"""
+    if not interaction.user.guild_permissions.manage_guild:
+        embed = create_embed(
+            title="❌ Permission Denied",
+            description="You need 'Manage Server' permission to set announcement roles.",
+            color=discord.Color.red()
+        )
+        return await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+    guild_id = str(interaction.guild.id)
+    
+    # Initialize guild config if needed
+    if guild_id not in guild_configs:
+        guild_configs[guild_id] = {}
+    
+    # Save the role ID
+    guild_configs[guild_id]["announcement_role"] = role.id
+    save_config()
+    
+    embed = create_embed(
+        title="✅ Announcement Role Set",
+        description=f"{role.mention} is now the announcement role for this server.",
+        color=discord.Color.green()
+    )
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
 @bot.tree.command(name="sync-cmds", description="Force sync commands (Owner only)")
 async def sync_cmds(interaction: discord.Interaction):
@@ -115,7 +187,9 @@ async def announce(interaction: discord.Interaction,
         description=message,
         color=discord.Color.gold()
     )
-    embed.set_thumbnail(url=interaction.guild.icon.url if interaction.guild.icon else None)
+    
+    if interaction.guild.icon:
+        embed.set_thumbnail(url=interaction.guild.icon.url)
     
     try:
         # Prepare ping string
@@ -179,7 +253,7 @@ async def reply(interaction: discord.Interaction,
         
         # Create professional reply embed
         embed = create_embed(
-            description=f"*Reply to [this message]({message.jump_url})*\n\n{content}",
+            description=f"**Reply to [this message]({message.jump_url})**\n\n{content}",
             color=discord.Color.blue()
         )
         embed.set_author(
@@ -234,7 +308,8 @@ async def dm(interaction: discord.Interaction,
             description=message,
             color=discord.Color.blue()
         )
-        embed.set_thumbnail(url=interaction.guild.icon.url if interaction.guild.icon else None)
+        if interaction.guild and interaction.guild.icon:
+            embed.set_thumbnail(url=interaction.guild.icon.url)
         
         # Send DM
         await user.send(embed=embed)
@@ -280,11 +355,15 @@ async def check_perms(interaction: discord.Interaction):
     # Get user's roles
     roles = ", ".join([role.name for role in interaction.user.roles]) or "No roles"
     
+    # Get current guild's announcement role
+    guild_id = str(interaction.guild.id)
+    announce_role_id = guild_configs.get(guild_id, {}).get("announcement_role") if interaction.guild else None
+    
     description = (
         f"{perm_status}\n\n"
-        f"*Your roles:* {roles}\n"
-        f"*Announcement role ID:* {ANNOUNCEMENT_ROLE_ID or 'Not set'}\n"
-        f"*Manage Messages permission:* {interaction.user.guild_permissions.manage_messages}\n\n"
+        f"**Your roles:** {roles}\n"
+        f"**Announcement role ID:** {announce_role_id or 'Not set'}\n"
+        f"**Manage Messages permission:** {interaction.user.guild_permissions.manage_messages}\n\n"
         f"Contact server admins if you should have access."
     )
     
@@ -295,6 +374,26 @@ async def check_perms(interaction: discord.Interaction):
     )
     
     await interaction.response.send_message(embed=embed, ephemeral=True)
+
+@bot.event
+async def on_guild_join(guild):
+    """Handle joining new servers"""
+    print(f"✅ Joined new server: {guild.name} (ID: {guild.id})")
+    # Initialize default config for new server
+    guild_id = str(guild.id)
+    if guild_id not in guild_configs:
+        guild_configs[guild_id] = {}
+        save_config()
+
+@bot.event
+async def on_guild_remove(guild):
+    """Handle leaving servers"""
+    print(f"❌ Left server: {guild.name} (ID: {guild.id})")
+    # Clean up config
+    guild_id = str(guild.id)
+    if guild_id in guild_configs:
+        del guild_configs[guild_id]
+        save_config()
 
 try:
     bot.run(token)
@@ -308,4 +407,4 @@ except discord.PrivilegedIntentsRequired:
 except discord.LoginFailure:
     print("❌ Invalid token. Check your DISCORD_TOKEN")
 except Exception as e:
-    print(f"❌ Unexpected error: {e}")
+    print(f"❌ Unexpected error: {e}")
