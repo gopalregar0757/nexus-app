@@ -346,21 +346,21 @@ async def announce(interaction: discord.Interaction,
     # Send the modal to the user
     await interaction.response.send_modal(AnnouncementModal())
 
-@bot.tree.command(name="attach-announce", description="Send an announcement with attachments")
+@bot.tree.command(name="attach-announce", description="Send an announcement with an attachment")
 @app_commands.describe(
     channel="Channel to send announcement to",
     ping_everyone="Ping @everyone with this announcement",
     ping_here="Ping @here with this announcement",
     message="Announcement message content",
-    attachments="Attach files to your announcement"
+    attachment="Attach a file to your announcement"
 )
 async def attach_announce(interaction: discord.Interaction, 
                           channel: discord.TextChannel, 
                           message: str,
                           ping_everyone: bool = False,
                           ping_here: bool = False,
-                          attachments: Optional[List[discord.Attachment]] = None):
-    """Send an announcement with attachments"""
+                          attachment: Optional[discord.Attachment] = None):
+    """Send an announcement with an attachment"""
     # Permission check
     if not has_announcement_permission(interaction):
         embed = create_embed(
@@ -388,13 +388,12 @@ async def attach_announce(interaction: discord.Interaction,
         if ping_here:
             ping_str += "@here "
         
-        # Process attachments
+        # Process attachment (single file)
         files = []
-        if attachments:
-            for attachment in attachments:
-                files.append(await attachment.to_file())
+        if attachment:
+            files.append(await attachment.to_file())
         
-        # Send announcement with attachments
+        # Send announcement with attachment
         await channel.send(
             content=ping_str if ping_str else None, 
             embed=embed,
@@ -402,9 +401,11 @@ async def attach_announce(interaction: discord.Interaction,
             allowed_mentions=discord.AllowedMentions(everyone=True) if (ping_everyone or ping_here) else None
         )
         
+        # Count attachments (0 or 1)
+        num_attachments = 1 if attachment else 0
         embed = create_embed(
             title="✅ Announcement Sent",
-            description=f"Announcement with {len(files)} attachment(s) sent to {channel.mention}!",
+            description=f"Announcement with {num_attachments} attachment(s) sent to {channel.mention}!",
             color=discord.Color.green()
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
