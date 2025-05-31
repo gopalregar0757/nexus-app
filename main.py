@@ -275,7 +275,7 @@ class AnnouncementModal(Modal, title='Create Announcement'):
 
     async def on_submit(self, interaction: discord.Interaction):
         # Create embed
-        formatted_message = f"📢 **Official Announcement**\n\n```\n{self.message.value}\n```"
+        formatted_message = f"📢 ** **\n\n```\n{self.message.value}\n```"
         embed = discord.Embed(
             description=formatted_message,
             color=discord.Color.gold()
