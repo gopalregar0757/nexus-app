@@ -258,113 +258,20 @@ async def sync_commands(interaction: discord.Interaction):
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-@bot.tree.command(name="announce", description="Send an announcement to a channel")
+# New Announcement Commands
+@bot.tree.command(name="announce-simple", description="Send a simple text announcement")
 @app_commands.describe(
     channel="Channel to send announcement to",
+    message="Announcement message content (formatting preserved)",
     ping_everyone="Ping @everyone with this announcement",
     ping_here="Ping @here with this announcement"
 )
-async def announce(interaction: discord.Interaction, 
-                  channel: discord.TextChannel, 
-                  ping_everyone: bool = False,
-                  ping_here: bool = False):
-    """Send a professional announcement to a specified channel"""
-    # Permission check
-    if not has_announcement_permission(interaction):
-        embed = create_embed(
-            title="❌ Permission Denied",
-            description="You need the Announcement role or 'Manage Messages' permission!",
-            color=discord.Color.red()
-        )
-        return await interaction.response.send_message(embed=embed, ephemeral=True)
-    
-    # Create a modal for message input
-    class AnnouncementModal(Modal, title="Create Announcement"):
-        message = TextInput(
-            label="Announcement Content",
-            style=discord.TextStyle.paragraph,
-            placeholder="Type your announcement here...\nAll formatting will be preserved exactly as entered!",
-            required=True,
-            max_length=4000
-        )
-        
-        async def on_submit(self, modal_interaction: discord.Interaction):
-            await modal_interaction.response.defer(thinking=True, ephemeral=True)
-            
-            # Create professional announcement embed with perfect formatting preservation
-            formatted_message = (
-                "📢 **Official Announcement**\n\n"
-                f"```\n{self.message.value}\n```"
-            )
-            embed = create_embed(
-                description=formatted_message,
-                color=discord.Color.gold()
-            )
-            
-            if interaction.guild.icon:
-                embed.set_thumbnail(url=interaction.guild.icon.url)
-            
-            # Prepare ping string
-            ping_str = ""
-            if ping_everyone:
-                ping_str += "@everyone "
-            if ping_here:
-                ping_str += "@here "
-            
-            try:
-                # Send announcement
-                await channel.send(
-                    content=ping_str if ping_str else None, 
-                    embed=embed,
-                    allowed_mentions=discord.AllowedMentions(everyone=True) if (ping_everyone or ping_here) else None
-                )
-                
-                embed = create_embed(
-                    title="✅ Announcement Sent",
-                    description=f"Announcement successfully sent to {channel.mention}!",
-                    color=discord.Color.green()
-                )
-                await modal_interaction.followup.send(embed=embed, ephemeral=True)
-            except discord.Forbidden:
-                # Provide detailed permission error
-                error_msg = "❌ Bot lacks permissions in that channel!\n"
-                if ping_everyone or ping_here:
-                    error_msg += "• Need 'Mention Everyone' permission to ping @everyone/@here\n"
-                error_msg += "• Required: Send Messages, Embed Links"
-                
-                embed = create_embed(
-                    title="❌ Permission Error",
-                    description=error_msg,
-                    color=discord.Color.red()
-                )
-                await modal_interaction.followup.send(embed=embed, ephemeral=True)
-            except Exception as e:
-                embed = create_embed(
-                    title="❌ Announcement Failed",
-                    description=f"Error: {e}",
-                    color=discord.Color.red()
-                )
-                await modal_interaction.followup.send(embed=embed, ephemeral=True)
-
-    # Send the modal to the user
-    await interaction.response.send_modal(AnnouncementModal())
-
-@bot.tree.command(name="attach-announce", description="Send an announcement with an attachment")
-@app_commands.describe(
-    channel="Channel to send announcement to",
-    ping_everyone="Ping @everyone with this announcement",
-    ping_here="Ping @here with this announcement",
-    message="Announcement message content (formatting preserved)",
-    attachment="Attach a file to your announcement"
-)
-async def attach_announce(interaction: discord.Interaction, 
+async def announce_simple(interaction: discord.Interaction, 
                           channel: discord.TextChannel, 
                           message: str,
                           ping_everyone: bool = False,
-                          ping_here: bool = False,
-                          attachment: Optional[discord.Attachment] = None):
-    """Send an announcement with an attachment"""
-    # Permission check
+                          ping_here: bool = False):
+    """Send a simple text announcement"""
     if not has_announcement_permission(interaction):
         embed = create_embed(
             title="❌ Permission Denied",
@@ -373,7 +280,7 @@ async def attach_announce(interaction: discord.Interaction,
         )
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     
-    # Create professional announcement embed with perfect formatting preservation
+    # Create professional announcement embed
     formatted_message = (
         "📢 **Official Announcement**\n\n"
         f"```\n{message}\n```"
@@ -394,38 +301,17 @@ async def attach_announce(interaction: discord.Interaction,
         if ping_here:
             ping_str += "@here "
         
-        # Process attachment (single file)
-        files = []
-        if attachment:
-            files.append(await attachment.to_file())
-        
-        # Send announcement with attachment
+        # Send announcement
         await channel.send(
             content=ping_str if ping_str else None, 
             embed=embed,
-            files=files,
             allowed_mentions=discord.AllowedMentions(everyone=True) if (ping_everyone or ping_here) else None
         )
         
-        # Count attachments (0 or 1)
-        num_attachments = 1 if attachment else 0
         embed = create_embed(
             title="✅ Announcement Sent",
-            description=f"Announcement with {num_attachments} attachment(s) sent to {channel.mention}!",
+            description=f"Simple announcement sent to {channel.mention}!",
             color=discord.Color.green()
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-    except discord.Forbidden:
-        # Provide detailed permission error
-        error_msg = "❌ Bot lacks permissions in that channel!\n"
-        if ping_everyone or ping_here:
-            error_msg += "• Need 'Mention Everyone' permission to ping @everyone/@here\n"
-        error_msg += "• Required: Send Messages, Embed Links, Attach Files"
-        
-        embed = create_embed(
-            title="❌ Permission Error",
-            description=error_msg,
-            color=discord.Color.red()
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
     except Exception as e:
@@ -436,17 +322,88 @@ async def attach_announce(interaction: discord.Interaction,
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-@bot.tree.command(name="reply", description="Reply to a message in a channel")
+@bot.tree.command(name="announce-attachment", description="Send announcement with text and attachment")
 @app_commands.describe(
-    message_id="ID of the message to reply to",
-    channel="Channel where the message is located",
-    content="Your reply content (formatting preserved)"
+    channel="Channel to send announcement to",
+    message="Announcement message content (formatting preserved)",
+    attachment="File to attach to the announcement",
+    ping_everyone="Ping @everyone with this announcement",
+    ping_here="Ping @here with this announcement"
 )
-async def reply(interaction: discord.Interaction,
-               message_id: str,
-               channel: discord.TextChannel,
-               content: str):
-    """Reply to a specific message in a channel"""
+async def announce_attachment(interaction: discord.Interaction, 
+                              channel: discord.TextChannel, 
+                              message: str,
+                              attachment: discord.Attachment,
+                              ping_everyone: bool = False,
+                              ping_here: bool = False):
+    """Send announcement with text and attachment"""
+    if not has_announcement_permission(interaction):
+        embed = create_embed(
+            title="❌ Permission Denied",
+            description="You need the Announcement role or 'Manage Messages' permission!",
+            color=discord.Color.red()
+        )
+        return await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+    # Create professional announcement embed
+    formatted_message = (
+        "📢 **Official Announcement**\n\n"
+        f"```\n{message}\n```"
+    )
+    embed = create_embed(
+        description=formatted_message,
+        color=discord.Color.gold()
+    )
+    
+    if interaction.guild.icon:
+        embed.set_thumbnail(url=interaction.guild.icon.url)
+    
+    try:
+        # Prepare ping string
+        ping_str = ""
+        if ping_everyone:
+            ping_str += "@everyone "
+        if ping_here:
+            ping_str += "@here "
+        
+        # Process attachment
+        file = await attachment.to_file()
+        
+        # Send announcement with attachment
+        await channel.send(
+            content=ping_str if ping_str else None, 
+            embed=embed,
+            file=file,
+            allowed_mentions=discord.AllowedMentions(everyone=True) if (ping_everyone or ping_here) else None
+        )
+        
+        embed = create_embed(
+            title="✅ Announcement Sent",
+            description=f"Announcement with attachment sent to {channel.mention}!",
+            color=discord.Color.green()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    except Exception as e:
+        embed = create_embed(
+            title="❌ Announcement Failed",
+            description=f"Error: {e}",
+            color=discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+
+@bot.tree.command(name="announce-only-attachment", description="Send announcement with only an attachment")
+@app_commands.describe(
+    channel="Channel to send announcement to",
+    attachment="File to attach to the announcement",
+    ping_everyone="Ping @everyone with this announcement",
+    ping_here="Ping @here with this announcement"
+)
+async def announce_only_attachment(interaction: discord.Interaction, 
+                                   channel: discord.TextChannel, 
+                                   attachment: discord.Attachment,
+                                   ping_everyone: bool = False,
+                                   ping_here: bool = False):
+    """Send announcement with only an attachment"""
     if not has_announcement_permission(interaction):
         embed = create_embed(
             title="❌ Permission Denied",
@@ -456,100 +413,136 @@ async def reply(interaction: discord.Interaction,
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     
     try:
-        message = await channel.fetch_message(int(message_id))
+        # Prepare ping string
+        ping_str = ""
+        if ping_everyone:
+            ping_str += "@everyone "
+        if ping_here:
+            ping_str += "@here "
         
-        # Create professional reply embed with perfect formatting preservation
-        formatted_content = (
-            f"**Reply to [this message]({message.jump_url})**\n\n"
-            f"```\n{content}\n```"
+        # Process attachment
+        file = await attachment.to_file()
+        
+        # Send announcement with only attachment
+        await channel.send(
+            content=ping_str if ping_str else None, 
+            file=file,
+            allowed_mentions=discord.AllowedMentions(everyone=True) if (ping_everyone or ping_here) else None
         )
-        embed = create_embed(
-            description=formatted_content,
-            color=discord.Color.blue()
-        )
-        
-        await channel.send(embed=embed)
         
         embed = create_embed(
-            title="✅ Reply Sent",
-            description=f"Your reply was successfully sent to {channel.mention}!",
+            title="✅ Announcement Sent",
+            description=f"Attachment-only announcement sent to {channel.mention}!",
             color=discord.Color.green()
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-    except discord.NotFound:
-        embed = create_embed(
-            title="❌ Message Not Found",
-            description="Could not find the specified message in that channel.",
-            color=discord.Color.red()
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
     except Exception as e:
         embed = create_embed(
-            title="❌ Reply Failed",
+            title="❌ Announcement Failed",
             description=f"Error: {e}",
             color=discord.Color.red()
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-@bot.tree.command(name="dm", description="Send a direct message to a user")
+# Welcome System
+@bot.tree.command(name="set-welcome", description="Configure welcome messages (Admin only)")
 @app_commands.describe(
-    user="User to message",
-    message="Message content (formatting preserved)"
+    welcome_channel="Channel to send welcome messages",
+    dm_message="Message to send in DMs when someone joins"
 )
-async def dm(interaction: discord.Interaction, 
-             user: discord.Member, 
-             message: str):
-    """Send a professional direct message to a user"""
-    if not has_announcement_permission(interaction):
+async def set_welcome(interaction: discord.Interaction, 
+                      welcome_channel: discord.TextChannel, 
+                      dm_message: str):
+    """Set welcome channel and DM message"""
+    if not interaction.user.guild_permissions.manage_guild:
         embed = create_embed(
             title="❌ Permission Denied",
-            description="You need the Announcement role or 'Manage Messages' permission!",
+            description="You need 'Manage Server' permission to configure welcome messages.",
             color=discord.Color.red()
         )
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     
-    try:
-        # Create professional DM embed with perfect formatting preservation
-        formatted_message = (
-            "📨 **Message from Nexus Esports**\n\n"
-            "For any queries or further support, contact @acroneop in our Official Server:\n"
-            "https://discord.gg/xPGJCWpMbM\n\n"
-            f"```\n{message}\n```"
-        )
-        embed = discord.Embed(
-            description=formatted_message,
-            color=discord.Color.blue(),
-            timestamp=datetime.utcnow()
-        )
-        embed.set_footer(text="Nexus Esports Official | DM Moderators or Officials for any Query!")
-        
-        if interaction.guild and interaction.guild.icon:
-            embed.set_thumbnail(url=interaction.guild.icon.url)
-        
-        # Send DM
-        await user.send(embed=embed)
-        
-        embed = create_embed(
-            title="✅ Message Delivered",
-            description=f"Message successfully sent to {user.mention}!",
-            color=discord.Color.green()
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-    except discord.Forbidden:
-        embed = create_embed(
-            title="❌ Delivery Failed",
-            description="User has DMs disabled or has blocked the bot.",
-            color=discord.Color.red()
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-    except Exception as e:
-        embed = create_embed(
-            title="❌ Error Sending Message",
-            description=f"Error: {e}",
-            color=discord.Color.red()
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+    guild_id = str(interaction.guild.id)
+    
+    # Initialize guild config if needed
+    if guild_id not in guild_configs:
+        guild_configs[guild_id] = {}
+    
+    # Save welcome settings
+    guild_configs[guild_id]["welcome_channel"] = welcome_channel.id
+    guild_configs[guild_id]["welcome_dm"] = dm_message
+    save_config()
+    
+    embed = create_embed(
+        title="✅ Welcome System Configured",
+        description=(
+            f"Welcome messages will be sent to {welcome_channel.mention}\n"
+            f"DM message set to: ```\n{dm_message}\n```"
+        ),
+        color=discord.Color.green()
+    )
+    await interaction.response.send_message(embed=embed, ephemeral=True)
 
+@bot.event
+async def on_member_join(member: discord.Member):
+    """Send welcome messages when a member joins"""
+    guild_id = str(member.guild.id)
+    
+    # Check if welcome is configured
+    if guild_id not in guild_configs:
+        return
+    
+    welcome_channel_id = guild_configs[guild_id].get("welcome_channel")
+    welcome_dm = guild_configs[guild_id].get("welcome_dm")
+    
+    # Send channel welcome
+    if welcome_channel_id:
+        try:
+            channel = member.guild.get_channel(welcome_channel_id)
+            if channel:
+                # Create welcome message with GIF
+                welcome_text = (
+                    f"Bro {member.mention}, first click on Nexus Esports above and select 'Show All Channels' "
+                    "so that all channels become visible to you. And one more thing...\n"
+                    "💕 Welcome to Nexus Esports 💕"
+                )
+                
+                # Create embed with GIF
+                embed = discord.Embed(color=discord.Color.blue())
+                embed.set_image(url="https://cdn.discordapp.com/attachments/1378018158010695722/1378421143358275675/standard_1.gif")
+                
+                await channel.send(content=welcome_text, embed=embed)
+        except Exception as e:
+            print(f"⚠️ Error sending channel welcome: {e}")
+    
+    # Send DM welcome
+    if welcome_dm:
+        try:
+            # Create professional DM embed
+            formatted_message = (
+                "📨 **Welcome to Nexus Esports!**\n\n"
+                f"```\n{welcome_dm}\n```\n"
+                "For any queries or further support, contact @acroneop in our Official Server:\n"
+                "https://discord.gg/xPGJCWpMbM"
+            )
+            embed = discord.Embed(
+                description=formatted_message,
+                color=discord.Color.blue(),
+                timestamp=datetime.utcnow()
+            )
+            embed.set_footer(text="Nexus Esports Official | DM Moderators or Officials for any Query!")
+            
+            if member.guild.icon:
+                embed.set_thumbnail(url=member.guild.icon.url)
+            
+            await member.send(embed=embed)
+        except discord.Forbidden:
+            # User has DMs disabled
+            pass
+        except Exception as e:
+            print(f"⚠️ Error sending welcome DM: {e}")
+
+# Other commands remain the same
 @bot.tree.command(name="ping", description="Test bot responsiveness")
 async def ping(interaction: discord.Interaction):
     """Simple ping command with latency check"""
