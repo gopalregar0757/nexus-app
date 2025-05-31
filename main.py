@@ -465,14 +465,19 @@ async def dm_user(
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     
     try:
+        # Create the base message
+        base_message = f"**Message from {interaction.guild.name}:**\n{message}"
+        
+        # Add attachment notice if there's an attachment
+        if attachment:
+            base_message += "\n\n📎 *Attachment included*"
+        
         # Create the embed
         embed = discord.Embed(
-            title=f"Message from {interaction.guild.name}",
-            description=message,
+            description=base_message,
             color=discord.Color(0x3e0000),
             timestamp=datetime.utcnow()
         )
-        embed.set_footer(text=f"Sent by {interaction.user.display_name}")
         
         # If there's an attachment
         files = []
@@ -485,9 +490,13 @@ async def dm_user(
         await user.send(embed=embed, files=files)
         
         # Confirm to the moderator
+        confirm_message = f"Message sent to {user.mention}"
+        if attachment:
+            confirm_message += f" with attachment: {attachment.filename}"
+            
         embed = create_embed(
             title="✅ DM Sent",
-            description=f"Message sent to {user.mention}",
+            description=confirm_message,
             color=discord.Color.green()
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -496,6 +505,13 @@ async def dm_user(
         embed = create_embed(
             title="❌ Failed to Send DM",
             description="This user has DMs disabled or blocked the bot.",
+            color=discord.Color.red()
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+    except Exception as e:
+        embed = create_embed(
+            title="❌ Error",
+            description=f"An error occurred: {str(e)}",
             color=discord.Color.red()
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
