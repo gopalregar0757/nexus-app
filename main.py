@@ -84,7 +84,7 @@ def create_embed(title: str = None, description: str = None, color: discord.Colo
         color=color,
         timestamp=datetime.utcnow()
     )
-    embed.set_footer(text="Nexus Esports")
+    embed.set_footer(text="Nexus Esports Official | Dm Moderators or Officials for any Query!")
     return embed
 
 def has_announcement_permission(interaction: discord.Interaction) -> bool:
@@ -200,7 +200,7 @@ async def announce(interaction: discord.Interaction,
     
     # Create professional announcement embed
     embed = create_embed(
-        title="📢 Official Announcement",
+        title=" ",
         description=message,
         color=discord.Color.gold()
     )
@@ -273,10 +273,6 @@ async def reply(interaction: discord.Interaction,
             description=f"**Reply to [this message]({message.jump_url})**\n\n{content}",
             color=discord.Color.blue()
         )
-        embed.set_author(
-            name=f"Reply from {interaction.user.display_name}",
-            icon_url=interaction.user.display_avatar.url
-        )
         
         await channel.send(embed=embed)
         
@@ -321,7 +317,7 @@ async def dm(interaction: discord.Interaction,
     try:
         # Create professional DM embed
         embed = create_embed(
-            title="📩 Message from Nexus Esports",
+            title="📩 Message from Nexus Esports \nFor any Query or Further support tag @acroneop on Our Official Server: https://discord.gg/xPGJCWpMbM ",
             description=message,
             color=discord.Color.blue()
         )
