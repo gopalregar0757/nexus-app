@@ -2,6 +2,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 import os
+import asyncio
 
 # Get token from environment
 token = os.getenv("DISCORD_TOKEN")
@@ -19,14 +20,57 @@ bot = commands.Bot(
     intents=intents
 )
 
+# Global command sync flag
+commands_synced = False
+
 @bot.event
 async def on_ready():
+    global commands_synced
     print(f"✅ Bot ready! Logged in as {bot.user}")
+    
+    if not commands_synced:
+        try:
+            # Sync commands globally
+            synced = await bot.tree.sync()
+            commands_synced = True
+            print(f"✅ Synced {len(synced)} command(s) globally")
+            
+            # Additional verification
+            await asyncio.sleep(2)  # Wait for propagation
+            app_info = await bot.application_info()
+            print(f"Bot ID: {app_info.id}")
+            print(f"Owner: {app_info.owner}")
+            
+        except Exception as e:
+            print(f"❌ Command sync failed: {e}")
+            print("Trying fallback sync method...")
+            try:
+                # Try syncing to current guild only
+                for guild in bot.guilds:
+                    bot.tree.copy_global_to(guild=guild)
+                    await bot.tree.sync(guild=guild)
+                    print(f"✅ Synced commands to guild: {guild.name}")
+                commands_synced = True
+            except Exception as e2:
+                print(f"❌ Fallback sync failed: {e2}")
+
+# Command to force sync
+@bot.tree.command(name="sync-cmds", description="Force sync commands (Owner only)")
+async def sync_cmds(interaction: discord.Interaction):
+    if interaction.user.id != (await bot.application_info()).owner.id:
+        return await interaction.response.send_message("❌ Owner only command!", ephemeral=True)
+    
     try:
         synced = await bot.tree.sync()
-        print(f"✅ Synced {len(synced)} command(s)")
+        await interaction.response.send_message(
+            f"✅ Synced {len(synced)} commands globally!",
+            ephemeral=True
+        )
     except Exception as e:
-        print(f"❌ Command sync failed: {e}")
+        await interaction.response.send_message(
+            f"❌ Sync failed: {e}",
+            ephemeral=True
+        )
 
 @bot.tree.command(name="send-announce", description="Send an announcement to a channel")
 @app_commands.describe(
@@ -115,7 +159,6 @@ async def send_message(interaction: discord.Interaction,
             ephemeral=True
         )
 
-# Ping command for testing
 @bot.tree.command(name="ping", description="Test bot responsiveness")
 async def ping(interaction: discord.Interaction):
     await interaction.response.send_message("🏓 Pong!")
