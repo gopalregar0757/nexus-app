@@ -4,16 +4,31 @@ from discord.ext import commands
 import os
 import asyncio
 
+# Debugging: Print environment information
+print("="*50)
+print("Starting Bot...")
+print(f"Python version: {os.sys.version}")
+print(f"Discord.py version: {discord.__version__}")
+print("="*50)
+
 # Get token from environment
 token = os.getenv("DISCORD_TOKEN")
-if not token:
+if token:
+    print(f"✅ Token found (length: {len(token)} characters)")
+else:
     print("❌ CRITICAL ERROR: Missing DISCORD_TOKEN")
     exit(1)
 
-# Configure intents
+# Configure intents with explicit debugging
 intents = discord.Intents.default()
+print(f"Default intents value: {intents.value}")
+
+# Enable required intents
 intents.message_content = True
-intents.members = True  # Required for user mentions
+intents.members = True
+print(f"Modified intents value: {intents.value}")
+print(f"Members intent: {intents.members}")
+print(f"Message content intent: {intents.message_content}")
 
 bot = commands.Bot(
     command_prefix='!',
@@ -26,46 +41,68 @@ commands_synced = False
 @bot.event
 async def on_ready():
     global commands_synced
-    print(f"✅ Bot ready! Logged in as {bot.user}")
+    print("\n" + "="*50)
+    print(f"✅ Bot ready! Logged in as {bot.user} (ID: {bot.user.id})")
+    print(f"Guilds connected: {len(bot.guilds)}")
+    
+    # Print guild details
+    for guild in bot.guilds:
+        print(f"- {guild.name} (ID: {guild.id})")
+        print(f"  Bot permissions: {guild.me.guild_permissions.value}")
     
     if not commands_synced:
         try:
             # Sync commands globally
+            print("\nAttempting global command sync...")
             synced = await bot.tree.sync()
             commands_synced = True
             print(f"✅ Synced {len(synced)} command(s) globally")
             
+            # Print synced command names
+            print("Commands synced:")
+            for cmd in synced:
+                print(f"- {cmd.name}")
+            
             # Additional verification
-            await asyncio.sleep(2)  # Wait for propagation
+            await asyncio.sleep(2)
             app_info = await bot.application_info()
-            print(f"Bot ID: {app_info.id}")
-            print(f"Owner: {app_info.owner}")
+            print(f"\nBot owner: {app_info.owner} (ID: {app_info.owner.id})")
             
         except Exception as e:
-            print(f"❌ Command sync failed: {e}")
-            print("Trying fallback sync method...")
+            print(f"❌ Global sync failed: {e}")
+            print("Trying guild-specific sync...")
             try:
-                # Try syncing to current guild only
+                # Try syncing to current guilds
                 for guild in bot.guilds:
-                    bot.tree.copy_global_to(guild=guild)
-                    await bot.tree.sync(guild=guild)
-                    print(f"✅ Synced commands to guild: {guild.name}")
-                commands_synced = True
+                    try:
+                        bot.tree.copy_global_to(guild=guild)
+                        await bot.tree.sync(guild=guild)
+                        print(f"✅ Synced commands to guild: {guild.name} (ID: {guild.id})")
+                        commands_synced = True
+                    except Exception as guild_e:
+                        print(f"❌ Failed to sync to {guild.name}: {guild_e}")
             except Exception as e2:
                 print(f"❌ Fallback sync failed: {e2}")
+    print("="*50 + "\n")
 
-# Command to force sync
 @bot.tree.command(name="sync-cmds", description="Force sync commands (Owner only)")
 async def sync_cmds(interaction: discord.Interaction):
-    if interaction.user.id != (await bot.application_info()).owner.id:
+    """Force sync commands with debug info"""
+    app_info = await bot.application_info()
+    if interaction.user.id != app_info.owner.id:
         return await interaction.response.send_message("❌ Owner only command!", ephemeral=True)
     
     try:
+        # Debug info
+        debug_info = f"Owner: {app_info.owner} (ID: {app_info.owner.id})\n"
+        debug_info += f"Bot: {bot.user} (ID: {bot.user.id})\n"
+        debug_info += f"Global commands: {len(await bot.tree.fetch_commands())}\n"
+        
+        # Perform sync
         synced = await bot.tree.sync()
-        await interaction.response.send_message(
-            f"✅ Synced {len(synced)} commands globally!",
-            ephemeral=True
-        )
+        debug_info += f"✅ Synced {len(synced)} commands globally!"
+        
+        await interaction.response.send_message(debug_info, ephemeral=True)
     except Exception as e:
         await interaction.response.send_message(
             f"❌ Sync failed: {e}",
@@ -82,22 +119,22 @@ async def send_announce(interaction: discord.Interaction,
                         channel: discord.TextChannel, 
                         message: str,
                         ping_role: discord.Role = None):
-    # Permission check
-    if not interaction.user.guild_permissions.manage_messages:
-        return await interaction.response.send_message(
-            "❌ You need 'Manage Messages' permission to use this command!",
-            ephemeral=True
-        )
-    
-    # Create embed
-    embed = discord.Embed(
-        title="📢 Announcement",
-        description=message,
-        color=discord.Color.gold()
-    )
-    embed.set_footer(text=f"Announced by {interaction.user.display_name}")
-    
     try:
+        # Permission check
+        if not interaction.user.guild_permissions.manage_messages:
+            return await interaction.response.send_message(
+                "❌ You need 'Manage Messages' permission!",
+                ephemeral=True
+            )
+        
+        # Create embed
+        embed = discord.Embed(
+            title="📢 Announcement",
+            description=message,
+            color=discord.Color.gold()
+        )
+        embed.set_footer(text=f"Announced by {interaction.user.display_name}")
+        
         # Prepare ping string
         ping_str = f"{ping_role.mention} " if ping_role else ""
         
@@ -109,12 +146,14 @@ async def send_announce(interaction: discord.Interaction,
         )
     except discord.Forbidden:
         await interaction.response.send_message(
-            "❌ I don't have permission to send messages in that channel!",
+            "❌ Bot lacks permissions in that channel!\n"
+            f"Required: `Send Messages`, `Embed Links`\n"
+            f"Current permissions: {channel.permissions_for(channel.guild.me).value}",
             ephemeral=True
         )
     except Exception as e:
         await interaction.response.send_message(
-            f"❌ Failed to send announcement: {e}",
+            f"❌ Error: {e}",
             ephemeral=True
         )
 
@@ -126,14 +165,14 @@ async def send_announce(interaction: discord.Interaction,
 async def send_message(interaction: discord.Interaction, 
                        user: discord.Member, 
                        message: str):
-    # Permission check
-    if not interaction.user.guild_permissions.manage_messages:
-        return await interaction.response.send_message(
-            "❌ You need 'Manage Messages' permission to use this command!",
-            ephemeral=True
-        )
-    
     try:
+        # Permission check
+        if not interaction.user.guild_permissions.manage_messages:
+            return await interaction.response.send_message(
+                "❌ You need 'Manage Messages' permission!",
+                ephemeral=True
+            )
+        
         # Create embed for DM
         embed = discord.Embed(
             title=f"Message from {interaction.guild.name}",
@@ -150,29 +189,56 @@ async def send_message(interaction: discord.Interaction,
         )
     except discord.Forbidden:
         await interaction.response.send_message(
-            "❌ User has DMs disabled or blocked me!",
+            "❌ User has DMs disabled or blocked the bot!",
             ephemeral=True
         )
     except Exception as e:
         await interaction.response.send_message(
-            f"❌ Failed to send message: {e}",
+            f"❌ Error: {e}",
             ephemeral=True
         )
 
 @bot.tree.command(name="ping", description="Test bot responsiveness")
 async def ping(interaction: discord.Interaction):
-    await interaction.response.send_message("🏓 Pong!")
+    """Basic ping command with latency info"""
+    latency = round(bot.latency * 1000)
+    await interaction.response.send_message(
+        f"🏓 Pong! Latency: {latency}ms\n"
+        f"Bot ID: {bot.user.id}\n"
+        f"Shards: {bot.shard_count}",
+        ephemeral=True
+    )
 
+@bot.event
+async def on_command_error(ctx, error):
+    """Handle command errors"""
+    if isinstance(error, commands.CommandNotFound):
+        return
+    print(f"❌ Command error: {error}")
+
+# Start the bot with enhanced error handling
 try:
+    print("Starting bot...")
     bot.run(token)
-except discord.PrivilegedIntentsRequired:
-    print("\n❌ PRIVILEGED INTENTS REQUIRED ❌")
+except discord.PrivilegedIntentsRequired as e:
+    print("\n" + "="*50)
+    print("❌ PRIVILEGED INTENTS REQUIRED ❌")
+    print(f"Error details: {e}")
     print("1. Go to https://discord.com/developers/applications")
     print("2. Select your application")
     print("3. Navigate to Bot > Privileged Gateway Intents")
     print("4. ENABLE 'MESSAGE CONTENT INTENT' and 'SERVER MEMBERS INTENT'")
-    print("5. Save changes and restart your bot\n")
+    print("5. Save changes and restart your bot")
+    print("="*50 + "\n")
+    # Reraise to get full traceback
+    raise
 except discord.LoginFailure:
-    print("❌ Invalid token. Check your DISCORD_TOKEN")
+    print("\n❌ LOGIN FAILED: Invalid token")
+    print("Verify your DISCORD_TOKEN environment variable")
+    print(f"Token length: {len(token) if token else 0} characters")
+    print("Get a new token at: https://discord.com/developers/applications")
+    raise
 except Exception as e:
-    print(f"❌ Unexpected error: {e}")
+    print(f"\n❌ UNEXPECTED ERROR: {e}")
+    print("Please check the traceback above")
+    raise
