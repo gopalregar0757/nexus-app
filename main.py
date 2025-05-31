@@ -97,7 +97,8 @@ async def on_message(message):
             color=discord.Color.blue(),
             timestamp=datetime.utcnow()
         )
-        embed.set_footer(text="Nexus Esports Official | Dm Moderators or Officials for any Query!")
+        # Set footer with required text
+        embed.set_footer(text="Nexus Esports Official | DM Moderators or Officials for any Query!")
         
         # Try to send the response
         try:
@@ -117,7 +118,8 @@ def create_embed(title: str = None, description: str = None, color: discord.Colo
         color=color,
         timestamp=datetime.utcnow()
     )
-    embed.set_footer(text="Nexus Esports Official | Dm Moderators or Officials for any Query!")
+    # Set footer with required text
+    embed.set_footer(text="Nexus Esports Official | DM Moderators or Officials for any Query!")
     return embed
 
 def has_announcement_permission(interaction: discord.Interaction) -> bool:
@@ -274,12 +276,15 @@ class AnnouncementModal(Modal, title='Create Announcement'):
         self.attachment = attachment
 
     async def on_submit(self, interaction: discord.Interaction):
-        # Create embed
-        formatted_message = f" ** **\n\n```\n{self.message.value}\n```"
+        # Create embed (removed "Official Announcement" text)
+        formatted_message = f"```\n{self.message.value}\n```"
         embed = discord.Embed(
             description=formatted_message,
-            color=discord.Color.gold()
+            color=discord.Color.gold(),
+            timestamp=datetime.utcnow()
         )
+        # Set footer with required text
+        embed.set_footer(text="Nexus Esports Official | DM Moderators or Officials for any Query!")
         
         if interaction.guild.icon:
             embed.set_thumbnail(url=interaction.guild.icon.url)
@@ -458,12 +463,14 @@ class DMModal(Modal, title='Send Direct Message'):
             if self.attachment:
                 formatted_message += "\n\n📎 *Attachment included*"
             
-            # Create embed
+            # Create embed with footer and timestamp
             embed = discord.Embed(
                 description=formatted_message,
                 color=discord.Color(0x3e0000),
                 timestamp=datetime.utcnow()
             )
+            # Set footer with required text
+            embed.set_footer(text="Nexus Esports Official | DM Moderators or Officials for any Query!")
             
             # Handle attachment
             files = []
@@ -529,42 +536,80 @@ async def dm_user(interaction: discord.Interaction,
     
     await interaction.response.send_modal(DMModal(user, attachment))
 
-# Context menu reply command
-@bot.tree.context_menu(name="Reply to User")
-async def reply_to_user(interaction: discord.Interaction, message: discord.Message):
-    """Reply to a user's message with a mention"""
+# New: DM Reply Command (Context Menu)
+@bot.tree.context_menu(name="DM Reply to User")
+async def dm_reply_to_user(interaction: discord.Interaction, message: discord.Message):
+    """Reply to a user via DM regarding their message"""
     # Check permissions
     if not interaction.user.guild_permissions.manage_messages:
-        embed = create_embed(
-            title="❌ Permission Denied",
-            description="You need 'Manage Messages' permission to use this command.",
-            color=discord.Color.red()
+        await interaction.response.send_message(
+            embed=create_embed(
+                title="❌ Permission Denied",
+                description="You need 'Manage Messages' permission",
+                color=discord.Color.red()
+            ),
+            ephemeral=True
         )
-        return await interaction.response.send_message(embed=embed, ephemeral=True)
+        return
     
-    # Create a modal for the reply
-    class ReplyModal(Modal, title="Reply to User"):
-        reply_content = TextInput(
-            label="Your reply",
+    # Create modal for the reply
+    class ReplyModal(Modal, title='DM Reply to User'):
+        reply_message = TextInput(
+            label='Your reply',
             style=discord.TextStyle.paragraph,
-            placeholder="Type your reply here...",
+            placeholder='Type your reply here...',
             required=True
         )
         
         async def on_submit(self, interaction: discord.Interaction):
-            # Send the reply mentioning the original author
-            await interaction.channel.send(
-                f"{message.author.mention}, {interaction.user.mention} replies:\n{self.reply_content}",
-                allowed_mentions=discord.AllowedMentions(users=True)
-            )
-            await interaction.response.send_message(
-                embed=create_embed(
-                    title="✅ Reply Sent",
-                    description="Your reply has been sent!",
-                    color=discord.Color.green()
-                ),
-                ephemeral=True
-            )
+            try:
+                # Create the DM message with context
+                formatted_content = (
+                    f"**📩 Reply from {interaction.guild.name} regarding your message:**\n"
+                    f"```\n{message.content}\n```\n\n"
+                    f"**Moderator's reply:**\n"
+                    f"```\n{self.reply_message.value}\n```\n\n"
+                    "For any queries or further support, contact @acroneop in our Official Server:\n"
+                    "https://discord.gg/xPGJCWpMbM"
+                )
+                
+                embed = discord.Embed(
+                    description=formatted_content,
+                    color=discord.Color(0x3e0000),
+                    timestamp=datetime.utcnow()
+                )
+                embed.set_footer(text="Nexus Esports Official | DM Moderators or Officials for any Query!")
+                
+                # Send the DM
+                await message.author.send(embed=embed)
+                
+                # Confirm to the moderator
+                await interaction.response.send_message(
+                    embed=create_embed(
+                        title="✅ Reply Sent",
+                        description=f"Reply sent to {message.author.mention} via DM!",
+                        color=discord.Color.green()
+                    ),
+                    ephemeral=True
+                )
+            except discord.Forbidden:
+                await interaction.response.send_message(
+                    embed=create_embed(
+                        title="❌ Failed to Send DM",
+                        description="This user has DMs disabled or blocked the bot.",
+                        color=discord.Color.red()
+                    ),
+                    ephemeral=True
+                )
+            except Exception as e:
+                await interaction.response.send_message(
+                    embed=create_embed(
+                        title="❌ Error",
+                        description=f"An error occurred: {str(e)}",
+                        color=discord.Color.red()
+                    ),
+                    ephemeral=True
+                )
     
     await interaction.response.send_modal(ReplyModal())
 
