@@ -76,6 +76,36 @@ async def on_ready():
         except Exception as e:
             print(f"❌ Command sync failed: {e}")
 
+# Auto-reply to DMs
+@bot.event
+async def on_message(message):
+    # Check if it's a DM and not from the bot itself
+    if isinstance(message.channel, discord.DMChannel) and message.author != bot.user:
+        # Create professional response embed
+        embed = discord.Embed(
+            title="📬 Nexus Esports Support",
+            description=(
+                "Thank you for your message!\n\n"
+                "For official support, please contact:\n"
+                "• **@acroneop** in our Official Server\n"
+                "• Join: https://discord.gg/xPGJCWpMbM\n\n"
+                "We'll assist you as soon as possible!"
+            ),
+            color=discord.Color.blue(),
+            timestamp=datetime.utcnow()
+        )
+        embed.set_footer(text="Nexus Esports Official | Dm Moderators or Officials for any Query!")
+        
+        # Try to send the response
+        try:
+            await message.channel.send(embed=embed)
+        except discord.Forbidden:
+            # Can't send message back (user blocked bot or closed DMs)
+            pass
+    
+    # Process commands (important for command functionality)
+    await bot.process_commands(message)
+
 def create_embed(title: str = None, description: str = None, color: discord.Color = discord.Color.blue()) -> discord.Embed:
     """Helper function to create consistent embeds"""
     embed = discord.Embed(
