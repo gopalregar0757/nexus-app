@@ -468,7 +468,7 @@ async def dm_user(
         # Create the base message with server link
         base_message = (
             f"**Message from {interaction.guild.name}:**\n{message}\n\n"
-            "For any queries or further support, contact @acroneop in our Official Server:\n"
+            "📨For any queries or further support, contact @acroneop in our Official Server:\n"
             "https://discord.gg/xPGJCWpMbM"
         )
         
