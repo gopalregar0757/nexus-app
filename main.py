@@ -98,6 +98,10 @@ def has_announcement_permission(interaction: discord.Interaction) -> bool:
     if interaction.user.guild_permissions.manage_messages:
         return True
     
+    # Check if user is server owner
+    if interaction.user.id == interaction.guild.owner_id:
+        return True
+    
     # Check if user has announcement role
     if guild_id in guild_configs:
         role_id = guild_configs[guild_id].get("announcement_role")
@@ -135,21 +139,34 @@ async def set_announce_role(interaction: discord.Interaction, role: discord.Role
     )
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-@bot.tree.command(name="sync-cmds", description="Force sync commands (Owner only)")
-async def sync_cmds(interaction: discord.Interaction):
-    if interaction.user.id != (await bot.application_info()).owner.id:
+@bot.tree.command(name="sync-commands", description="Sync bot commands (Server Owner only)")
+async def sync_commands(interaction: discord.Interaction):
+    """Sync commands for the current server"""
+    # Check if user is server owner or bot owner
+    app_info = await bot.application_info()
+    is_bot_owner = interaction.user.id == app_info.owner.id
+    is_server_owner = interaction.guild and interaction.user.id == interaction.guild.owner_id
+    
+    if not (is_bot_owner or is_server_owner):
         embed = create_embed(
-            title="❌ Access Denied",
-            description="This command is restricted to the bot owner only.",
+            title="❌ Permission Denied",
+            description="Only server owners or bot owners can sync commands.",
             color=discord.Color.red()
         )
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     
     try:
-        synced = await bot.tree.sync()
+        # Sync for the current guild
+        if interaction.guild:
+            await bot.tree.sync(guild=interaction.guild)
+            message = f"✅ Commands synced for {interaction.guild.name}!"
+        else:
+            await bot.tree.sync()
+            message = "✅ Global commands synced!"
+        
         embed = create_embed(
-            title="✅ Success",
-            description=f"Synced {len(synced)} commands globally!",
+            title="✅ Sync Successful",
+            description=message,
             color=discord.Color.green()
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
@@ -363,7 +380,8 @@ async def check_perms(interaction: discord.Interaction):
         f"{perm_status}\n\n"
         f"**Your roles:** {roles}\n"
         f"**Announcement role ID:** {announce_role_id or 'Not set'}\n"
-        f"**Manage Messages permission:** {interaction.user.guild_permissions.manage_messages}\n\n"
+        f"**Manage Messages permission:** {interaction.user.guild_permissions.manage_messages}\n"
+        f"**Server Owner:** {interaction.user.id == interaction.guild.owner_id}\n\n"
         f"Contact server admins if you should have access."
     )
     
@@ -384,6 +402,13 @@ async def on_guild_join(guild):
     if guild_id not in guild_configs:
         guild_configs[guild_id] = {}
         save_config()
+    
+    # Sync commands for this new server
+    try:
+        await bot.tree.sync(guild=guild)
+        print(f"✅ Synced commands for {guild.name}")
+    except Exception as e:
+        print(f"❌ Failed to sync commands for {guild.name}: {e}")
 
 @bot.event
 async def on_guild_remove(guild):
