@@ -499,12 +499,22 @@ async def dm(interaction: discord.Interaction,
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     
     try:
-        # Create professional DM embed
-        embed = create_embed(
-            title="📩 Message from Nexus Esports \nFor any Query or Further support tag @acroneop on Our Official Server: https://discord.gg/xPGJCWpMbM ",
-            description=message,
-            color=discord.Color.blue()
+        # Format message in code block to preserve formatting and increase visibility
+        formatted_message = (
+            "📨 **Message from Nexus Esports**\n\n"
+            "For any queries or further support, contact @acroneop in our Official Server:\n"
+            "https://discord.gg/xPGJCWpMbM\n\n"
+            f"```\n{message}\n```"
         )
+        
+        # Create DM embed
+        embed = discord.Embed(
+            description=formatted_message,
+            color=discord.Color.blue(),
+            timestamp=datetime.utcnow()
+        )
+        embed.set_footer(text="Nexus Esports Official | DM Moderators or Officials for any Query!")
+        
         if interaction.guild and interaction.guild.icon:
             embed.set_thumbnail(url=interaction.guild.icon.url)
         
