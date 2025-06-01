@@ -1100,7 +1100,6 @@ async def reply_in_channel(interaction: discord.Interaction,
             ephemeral=True
         )
 
-# Social tracker commands
 @bot.tree.command(name="add-social-tracker", description="Add social media account tracking")
 @app_commands.describe(
     platform="Select platform to track",
@@ -1132,7 +1131,6 @@ async def add_social_tracker(interaction: discord.Interaction,
     if guild_id not in social_trackers:
         social_trackers[guild_id] = []
     
-    # Verify and extract account info
     account_info = {}
     try:
         if platform == "youtube":
@@ -1146,35 +1144,32 @@ async def add_social_tracker(interaction: discord.Interaction,
                     ephemeral=True
                 )
             
+            channel_id = None
+            
             # Extract channel ID from URL
             if "youtube.com/channel/" in account_url:
                 channel_id = account_url.split("youtube.com/channel/")[1].split("/")[0].split("?")[0]
             elif "youtube.com/@" in account_url:
                 handle = account_url.split("youtube.com/@")[1].split("/")[0].split("?")[0]
-    
-    # NEW: Use channels().list with forHandle parameter
-    try:
-        request = youtube_service.channels().list(
-            part="id,snippet",
-            forHandle=f"@{handle}"
-        )
-        response = request.execute()
-        
-        if not response.get('items'):
-            return await interaction.response.send_message(
-                embed=create_embed(
-                    title="❌ Channel Not Found",
-                    description="Couldn't find YouTube channel with that handle",
-                    color=discord.Color.red()
-                ),
-                ephemeral=True
-            )
-            
-        channel_id = response['items'][0]['id']  # Exact match
-    
-    # Keep existing error handling
-    except HttpError as e:
-        # Error handling
+                
+                # Use channels().list with forHandle parameter
+                request = youtube_service.channels().list(
+                    part="id,snippet",
+                    forHandle=handle
+                )
+                response = request.execute()
+                
+                if not response.get('items'):
+                    return await interaction.response.send_message(
+                        embed=create_embed(
+                            title="❌ Channel Not Found",
+                            description="Couldn't find YouTube channel with that handle",
+                            color=discord.Color.red()
+                        ),
+                        ephemeral=True
+                    )
+                    
+                channel_id = response['items'][0]['id']  # Exact match
             else:
                 return await interaction.response.send_message(
                     embed=create_embed(
@@ -1185,7 +1180,7 @@ async def add_social_tracker(interaction: discord.Interaction,
                     ephemeral=True
                 )
             
-            # Get initial stats
+            # Get initial stats with valid channel_id
             request = youtube_service.channels().list(
                 part='statistics,snippet',
                 id=channel_id
@@ -1267,15 +1262,24 @@ async def add_social_tracker(interaction: discord.Interaction,
             # Try to parse follower count
             try:
                 if 'K' in followers_str:
-                    account_info['last_count'] = int(float(followers_str.replace('K', '')) * 1000)
+                    account_info['last_count'] = int(float(followers_str.replace('K', '')) * 1000
                 elif 'M' in followers_str:
-                    account_info['last_count'] = int(float(followers_str.replace('M', '')) * 1000000)
+                    account_info['last_count'] = int(float(followers_str.replace('M', '')) * 1000000
                 else:
                     account_info['last_count'] = int(followers_str.replace(',', ''))
             except Exception as e:
                 print(f"Instagram follower parse error: {e}")
                 account_info['last_count'] = 0
     
+    except HttpError as e:
+        return await interaction.response.send_message(
+            embed=create_embed(
+                title="❌ YouTube API Error",
+                description=f"YouTube API error: {str(e)}",
+                color=discord.Color.red()
+            ),
+            ephemeral=True
+        )
     except Exception as e:
         return await interaction.response.send_message(
             embed=create_embed(
