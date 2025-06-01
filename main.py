@@ -887,6 +887,471 @@ async def reply_in_channel(interaction: discord.Interaction,
             ephemeral=True
         )
     
+# Add to imports (top of file)
+import asyncio
+import requests
+from bs4 import BeautifulSoup
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
+
+# YouTube API setup (add after token)
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+if not YOUTUBE_API_KEY:
+    print("⚠️ Warning: Missing YOUTUBE_API_KEY - YouTube tracking disabled")
+youtube_service = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY) if YOUTUBE_API_KEY else None
+
+# Social tracker storage
+SOCIAL_FILE = "social_trackers.json"
+social_trackers = {}
+
+def load_social_trackers():
+    global social_trackers
+    try:
+        if os.path.exists(SOCIAL_FILE):
+            with open(SOCIAL_FILE, 'r') as f:
+                social_trackers = json.load(f)
+    except Exception as e:
+        print(f"⚠️ Error loading social trackers: {e}")
+        social_trackers = {}
+
+def save_social_trackers():
+    try:
+        with open(SOCIAL_FILE, 'w') as f:
+            json.dump(social_trackers, f, indent=2)
+    except Exception as e:
+        print(f"⚠️ Error saving social trackers: {e}")
+
+# Load on startup (add in on_ready or before bot.run)
+load_social_trackers()
+
+# Add to on_ready() function (inside the function)
+@bot.event
+async def on_ready():
+    global commands_synced
+    print(f"✅ Bot ready! Logged in as {bot.user}")
+    
+    # ... existing code ...
+    
+    # Add this at the end of the on_ready function:
+    if not hasattr(bot, 'social_task'):
+        bot.social_task = bot.loop.create_task(social_update_task())
+        print("✅ Started social media tracking task")
+
+# Background task for checking social updates (add after on_ready)
+async def social_update_task():
+    await bot.wait_until_ready()
+    while not bot.is_closed():
+        try:
+            await check_social_updates()
+        except Exception as e:
+            print(f"⚠️ Social update error: {e}")
+        await asyncio.sleep(300)  # Check every 5 minutes
+
+async def check_social_updates():
+    for guild_id, trackers in list(social_trackers.items()):
+        for tracker in trackers[:]:  # Use copy for safe iteration
+            try:
+                if tracker['platform'] == 'youtube':
+                    await check_youtube_update(guild_id, tracker)
+                elif tracker['platform'] == 'instagram':
+                    await check_instagram_update(guild_id, tracker)
+            except Exception as e:
+                print(f"⚠️ Error checking {tracker['platform']} tracker: {e}")
+
+async def check_youtube_update(guild_id, tracker):
+    if not youtube_service:
+        return
+        
+    try:
+        request = youtube_service.channels().list(
+            part='statistics,snippet',
+            id=tracker['channel_id']
+        )
+        response = request.execute()
+        
+        if not response.get('items'):
+            return
+        
+        stats = response['items'][0]['statistics']
+        current_subs = int(stats['subscriberCount'])
+        last_subs = tracker.get('last_count', 0)
+        
+        if current_subs > last_subs:
+            # Get channel name
+            channel_name = response['items'][0]['snippet']['title']
+            
+            # Calculate growth
+            growth = current_subs - last_subs
+            
+            # Update tracker
+            tracker['last_count'] = current_subs
+            save_social_trackers()
+            
+            # Send notification
+            channel = bot.get_channel(int(tracker['post_channel']))
+            if channel:
+                embed = discord.Embed(
+                    title="🎉 YouTube Milestone Reached!",
+                    description=(
+                        f"**{channel_name}** just hit **{current_subs:,} subscribers**!\n"
+                        f"`+{growth:,}` since last update"
+                    ),
+                    color=discord.Color.red(),
+                    url=tracker['url']
+                )
+                embed.set_thumbnail(url="https://i.imgur.com/krKzGz0.png")
+                embed.set_footer(text="Nexus Esports Social Tracker")
+                await channel.send(embed=embed)
+    except HttpError as e:
+        print(f"YouTube API error: {e}")
+    except Exception as e:
+        print(f"General YouTube error: {e}")
+
+async def check_instagram_update(guild_id, tracker):
+    # Instagram requires web scraping - use carefully
+    try:
+        response = requests.get(tracker['url'], headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }, timeout=10)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Find follower count in meta tags
+        meta_tag = soup.find('meta', property='og:description')
+        if meta_tag:
+            content = meta_tag.get('content', '')
+            # Extract follower count from string like "1M Followers, 500 Following..."
+            if 'Followers' in content:
+                followers_str = content.split(' Followers')[0].split(' ')[-1]
+                # Convert to number
+                if followers_str.endswith('K'):
+                    current_followers = int(float(followers_str.replace('K', '')) * 1000
+                elif followers_str.endswith('M'):
+                    current_followers = int(float(followers_str.replace('M', '')) * 1000000
+                else:
+                    current_followers = int(followers_str.replace(',', ''))
+            else:
+                return
+        else:
+            return
+        
+        last_followers = tracker.get('last_count', 0)
+        
+        if current_followers > last_followers:
+            # Update tracker
+            tracker['last_count'] = current_followers
+            save_social_trackers()
+            
+            # Send notification
+            channel = bot.get_channel(int(tracker['post_channel']))
+            if channel:
+                growth = current_followers - last_followers
+                embed = discord.Embed(
+                    title="📸 Instagram Growth!",
+                    description=(
+                        f"**{tracker['account_name']}** now has **{current_followers:,} followers**!\n"
+                        f"`+{growth:,}` since last update"
+                    ),
+                    color=discord.Color.purple(),
+                    url=tracker['url']
+                )
+                embed.set_thumbnail(url="https://i.imgur.com/vn8M9aO.png")
+                embed.set_footer(text="Nexus Esports Social Tracker")
+                await channel.send(embed=embed)
+    except Exception as e:
+        print(f"Instagram scraping failed: {e}")
+
+# New command: add-social-tracker (add after other commands)
+@bot.tree.command(name="add-social-tracker", description="Add social media account tracking")
+@app_commands.describe(
+    platform="Select platform to track",
+    account_url="Full URL to the account",
+    post_channel="Channel to post updates"
+)
+@app_commands.choices(platform=[
+    app_commands.Choice(name="YouTube", value="youtube"),
+    app_commands.Choice(name="Instagram", value="instagram")
+])
+async def add_social_tracker(interaction: discord.Interaction, 
+                            platform: str, 
+                            account_url: str,
+                            post_channel: discord.TextChannel):
+    """Add social media account tracking"""
+    if not interaction.user.guild_permissions.manage_guild:
+        return await interaction.response.send_message(
+            embed=create_embed(
+                title="❌ Permission Denied",
+                description="You need 'Manage Server' permission to set up trackers",
+                color=discord.Color.red()
+            ),
+            ephemeral=True
+        )
+    
+    guild_id = str(interaction.guild.id)
+    
+    # Initialize guild storage
+    if guild_id not in social_trackers:
+        social_trackers[guild_id] = []
+    
+    # Verify and extract account info
+    account_info = {}
+    try:
+        if platform == "youtube":
+            if not YOUTUBE_API_KEY:
+                return await interaction.response.send_message(
+                    embed=create_embed(
+                        title="❌ YouTube Disabled",
+                        description="YouTube API key not configured",
+                        color=discord.Color.red()
+                    ),
+                    ephemeral=True
+                )
+            
+            # Extract channel ID from URL
+            if "youtube.com/channel/" in account_url:
+                channel_id = account_url.split("youtube.com/channel/")[1].split("/")[0].split("?")[0]
+            elif "youtube.com/@" in account_url:
+                handle = account_url.split("youtube.com/@")[1].split("/")[0].split("?")[0]
+                search_response = youtube_service.search().list(
+                    q=handle,
+                    part='snippet',
+                    type='channel',
+                    maxResults=1
+                ).execute()
+                if not search_response.get('items'):
+                    return await interaction.response.send_message(
+                        embed=create_embed(
+                            title="❌ Channel Not Found",
+                            description="Couldn't find YouTube channel",
+                            color=discord.Color.red()
+                        ),
+                        ephemeral=True
+                    )
+                channel_id = search_response['items'][0]['snippet']['channelId']
+            else:
+                return await interaction.response.send_message(
+                    embed=create_embed(
+                        title="❌ Invalid URL",
+                        description="Please provide a valid YouTube channel URL",
+                        color=discord.Color.red()
+                    ),
+                    ephemeral=True
+                )
+            
+            # Get initial stats
+            request = youtube_service.channels().list(
+                part='statistics,snippet',
+                id=channel_id
+            )
+            response = request.execute()
+            
+            if not response.get('items'):
+                return await interaction.response.send_message(
+                    embed=create_embed(
+                        title="❌ Channel Not Found",
+                        description="Couldn't find YouTube channel",
+                        color=discord.Color.red()
+                    ),
+                    ephemeral=True
+                )
+            
+            stats = response['items'][0]['statistics']
+            account_info = {
+                'platform': platform,
+                'url': f"https://www.youtube.com/channel/{channel_id}",
+                'channel_id': channel_id,
+                'account_name': response['items'][0]['snippet']['title'],
+                'last_count': int(stats['subscriberCount']),
+                'post_channel': str(post_channel.id)
+            }
+        
+        elif platform == "instagram":
+            # Extract username from URL
+            if "instagram.com/" not in account_url:
+                return await interaction.response.send_message(
+                    embed=create_embed(
+                        title="❌ Invalid URL",
+                        description="Please provide a valid Instagram profile URL",
+                        color=discord.Color.red()
+                    ),
+                    ephemeral=True
+                )
+            
+            username = account_url.split("instagram.com/")[1].split("/")[0].split("?")[0]
+            clean_url = f"https://www.instagram.com/{username}/"
+            
+            # Get initial follower count (approximate)
+            response = requests.get(clean_url, headers={
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }, timeout=10)
+            soup = BeautifulSoup(response.text, 'html.parser')
+            meta_tag = soup.find('meta', property='og:description')
+            
+            if not meta_tag:
+                return await interaction.response.send_message(
+                    embed=create_embed(
+                        title="❌ Account Not Found",
+                        description="Couldn't fetch Instagram data",
+                        color=discord.Color.red()
+                    ),
+                    ephemeral=True
+                )
+            
+            content = meta_tag.get('content', '')
+            if 'Followers' not in content:
+                return await interaction.response.send_message(
+                    embed=create_embed(
+                        title="❌ Data Extraction Failed",
+                        description="Couldn't find follower count in page",
+                        color=discord.Color.red()
+                    ),
+                    ephemeral=True
+                )
+            
+            followers_str = content.split(' Followers')[0].split(' ')[-1]
+            
+            account_info = {
+                'platform': platform,
+                'url': clean_url,
+                'account_name': username,
+                'post_channel': str(post_channel.id)
+            }
+            
+            # Try to parse follower count
+            try:
+                if 'K' in followers_str:
+                    account_info['last_count'] = int(float(followers_str.replace('K', '')) * 1000
+                elif 'M' in followers_str:
+                    account_info['last_count'] = int(float(followers_str.replace('M', '')) * 1000000
+                else:
+                    account_info['last_count'] = int(followers_str.replace(',', ''))
+            except Exception as e:
+                print(f"Instagram follower parse error: {e}")
+                account_info['last_count'] = 0
+    
+    except Exception as e:
+        return await interaction.response.send_message(
+            embed=create_embed(
+                title="❌ Setup Failed",
+                description=f"Error: {str(e)}",
+                color=discord.Color.red()
+            ),
+            ephemeral=True
+        )
+    
+    # Add to trackers
+    social_trackers[guild_id].append(account_info)
+    save_social_trackers()
+    
+    await interaction.response.send_message(
+        embed=create_embed(
+            title="✅ Tracker Added",
+            description=(
+                f"Now tracking **{account_info['account_name']}** on {platform.capitalize()}!\n"
+                f"Updates will be posted in {post_channel.mention}"
+            ),
+            color=discord.Color.green()
+        ),
+        ephemeral=True
+    )
+
+# New command: list-social-trackers
+@bot.tree.command(name="list-social-trackers", description="Show active social media trackers")
+async def list_social_trackers(interaction: discord.Interaction):
+    """List active social trackers"""
+    if not interaction.user.guild_permissions.manage_guild:
+        return await interaction.response.send_message(
+            embed=create_embed(
+                title="❌ Permission Denied",
+                description="You need 'Manage Server' permission",
+                color=discord.Color.red()
+            ),
+            ephemeral=True
+        )
+    
+    guild_id = str(interaction.guild.id)
+    trackers = social_trackers.get(guild_id, [])
+    
+    if not trackers:
+        return await interaction.response.send_message(
+            embed=create_embed(
+                title="📊 Social Trackers",
+                description="No active trackers configured",
+                color=discord.Color.blue()
+            ),
+            ephemeral=True
+        )
+    
+    embed = discord.Embed(
+        title="📊 Active Social Trackers",
+        color=discord.Color.blue(),
+        timestamp=datetime.utcnow()
+    )
+    
+    for i, tracker in enumerate(trackers, 1):
+        channel = interaction.guild.get_channel(int(tracker['post_channel']))
+        count = tracker.get('last_count', 'N/A')
+        if isinstance(count, int):
+            count = f"{count:,}"
+            
+        embed.add_field(
+            name=f"{i}. {tracker['account_name']}",
+            value=(
+                f"**Platform:** {tracker['platform'].capitalize()}\n"
+                f"**Channel:** {channel.mention if channel else 'Not found'}\n"
+                f"**Current Count:** {count}\n"
+                f"[View Profile]({tracker['url']})"
+            ),
+            inline=False
+        )
+    
+    embed.set_footer(text="Nexus Esports Social Tracker")
+    await interaction.response.send_message(embed=embed, ephemeral=True)
+
+# New command: remove-social-tracker
+@bot.tree.command(name="remove-social-tracker", description="Remove a social media tracker")
+@app_commands.describe(index="Tracker number to remove (see /list-social-trackers)")
+async def remove_social_tracker(interaction: discord.Interaction, index: int):
+    """Remove social tracker"""
+    if not interaction.user.guild_permissions.manage_guild:
+        return await interaction.response.send_message(
+            embed=create_embed(
+                title="❌ Permission Denied",
+                description="You need 'Manage Server' permission",
+                color=discord.Color.red()
+            ),
+            ephemeral=True
+        )
+    
+    guild_id = str(interaction.guild.id)
+    trackers = social_trackers.get(guild_id, [])
+    
+    if index < 1 or index > len(trackers):
+        return await interaction.response.send_message(
+            embed=create_embed(
+                title="❌ Invalid Index",
+                description="Please use a valid tracker number",
+                color=discord.Color.red()
+            ),
+            ephemeral=True
+        )
+    
+    removed = trackers.pop(index-1)
+    if trackers:
+        social_trackers[guild_id] = trackers
+    else:
+        del social_trackers[guild_id]
+    save_social_trackers()
+    
+    await interaction.response.send_message(
+        embed=create_embed(
+            title="✅ Tracker Removed",
+            description=f"No longer tracking **{removed['account_name']}**",
+            color=discord.Color.green()
+        ),
+        ephemeral=True
+    )
+
+
     try:
         # Create the arrow symbol and formatted message
         arrow = "↳"
