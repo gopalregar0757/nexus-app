@@ -1,6 +1,5 @@
-# railway.toml
 [build]
-builder = "docker"  # Must be lowercase "docker"
+builder = "dockerfile"
 
 [deploy]
-start_command = "gunicorn your_project.wsgi:application --bind 0.0.0.0:$PORT"
+start_command = "python main.py"
