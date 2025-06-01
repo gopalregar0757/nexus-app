@@ -6,6 +6,11 @@ import os
 import json
 from datetime import datetime
 from typing import Optional
+import asyncio
+import requests
+from bs4 import BeautifulSoup
+from googleapiclient.discovery import build
+from googleapiclient.errors import HttpError
 
 # Get token from environment
 token = os.getenv("DISCORD_TOKEN")
@@ -895,9 +900,8 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
 # YouTube API setup (add after token)
+# Replace existing YOUTUBE_API_KEY code with:
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
-if not YOUTUBE_API_KEY:
-    print("⚠️ Warning: Missing YOUTUBE_API_KEY - YouTube tracking disabled")
 youtube_service = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY) if YOUTUBE_API_KEY else None
 
 # Social tracker storage
