@@ -400,7 +400,7 @@ async def announce_only_attachment(interaction: discord.Interaction,
         embed = create_embed(
             title="❌ Permission Denied",
             description="You need the Announcement role or 'Manage Messages' permission!",
-            color=discord.Color(0x3e0000))
+            color=discord.Color(0x3e0000)
         )
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     
@@ -432,7 +432,7 @@ async def announce_only_attachment(interaction: discord.Interaction,
         embed = create_embed(
             title="❌ Announcement Failed",
             description=f"Error: {e}",
-            color=discord.Color(0x3e0000))
+            color=discord.Color(0x3e0000)
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -466,7 +466,7 @@ class DMModal(Modal, title='Send Direct Message'):
             # Create embed with footer and timestamp
             embed = discord.Embed(
                 description=formatted_message,
-                color=discord.Color(0x3e0000)),
+                color=discord.Color(0x3e0000),
                 timestamp=datetime.utcnow()
             )
             # Set footer with required text
@@ -575,7 +575,7 @@ async def dm_reply_to_user(interaction: discord.Interaction, message: discord.Me
                 
                 embed = discord.Embed(
                     description=formatted_content,
-                    color=discord.Color(0x3e0000)),
+                    color=discord.Color(0x3e0000),
                     timestamp=datetime.utcnow()
                 )
                 embed.set_footer(text="Nexus Esports Official | DM Moderators or Officials for any Query!")
@@ -705,7 +705,7 @@ async def on_member_join(member: discord.Member):
                         f"Bro {member.mention},\n\n"  # Mention outside the code block
                         f"```\n{welcome_text}\n```"   # Instructions inside code block
                     ),
-                    color=discord.Color(0x3e0000))
+                    color=discord.Color(0x3e0000)
                 )
                 # Set GIF
                 embed.set_image(url="https://cdn.discordapp.com/attachments/1378018158010695722/1378426905585520901/standard_2.gif")
@@ -723,7 +723,7 @@ async def on_member_join(member: discord.Member):
             # Use configured DM
             embed = discord.Embed(
                 description=welcome_dm,
-                color=discord.Color(0x3e0000)),
+                color=discord.Color(0x3e0000),
                 timestamp=datetime.utcnow()
             )
             embed.set_footer(text="Nexus Esports Official | DM Moderators or Officials for any Query!")
@@ -756,7 +756,7 @@ async def on_member_join(member: discord.Member):
             
             embed = discord.Embed(
                 description=dm_message,
-                color=discord.Color(0x3e0000)),
+                color=discord.Color(0x3e0000),
                 timestamp=datetime.utcnow()
             )
             embed.set_footer(text="Nexus Esports Official | DM Moderators or Officials for any Query!")
@@ -846,7 +846,7 @@ async def add_link(interaction: discord.Interaction,
         embed = create_embed(
             title=title if title else "🔗 Nexus Esports Link",
             description=embed_description,
-            color=discord.Color(0x3e0000))
+            color=discord.Color(0x3e0000)
         )
         # Make the title clickable
         embed.url = url
