@@ -1150,7 +1150,7 @@ async def add_social_tracker(interaction: discord.Interaction,
             if "youtube.com/channel/" in account_url:
                 channel_id = account_url.split("youtube.com/channel/")[1].split("/")[0].split("?")[0]
             elif "youtube.com/@" in account_url:
-    handle = account_url.split("youtube.com/@")[1].split("/")[0].split("?")[0]
+                handle = account_url.split("youtube.com/@")[1].split("/")[0].split("?")[0]
     
     # NEW: Use channels().list with forHandle parameter
     try:
