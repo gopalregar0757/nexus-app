@@ -1262,9 +1262,9 @@ async def add_social_tracker(interaction: discord.Interaction,
             # Try to parse follower count
             try:
                 if 'K' in followers_str:
-                    account_info['last_count'] = int(float(followers_str.replace('K', '')) * 1000
+                    account_info['last_count'] = int(float(followers_str.replace('K', ''))) * 1000
                 elif 'M' in followers_str:
-                    account_info['last_count'] = int(float(followers_str.replace('M', '')) * 1000000
+                    account_info['last_count'] = int(float(followers_str.replace('M', ''))) * 1000000
                 else:
                     account_info['last_count'] = int(followers_str.replace(',', ''))
             except Exception as e:
