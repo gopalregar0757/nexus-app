@@ -255,8 +255,8 @@ async def sync_commands(interaction: discord.Interaction):
         embed = create_embed(
             title="❌ Sync Failed",
             description=description,
-            color=discord.Color(0x3e0000))
-        )
+            color=discord.Color(0x3e0000)
+)
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 # Modal for announcement text
