@@ -255,7 +255,7 @@ async def sync_commands(interaction: discord.Interaction):
         embed = create_embed(
             title="❌ Sync Failed",
             description=description,
-            color=discord.Color(0x3e0000)
+            color=discord.Color(0x3e0000))
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -400,7 +400,7 @@ async def announce_only_attachment(interaction: discord.Interaction,
         embed = create_embed(
             title="❌ Permission Denied",
             description="You need the Announcement role or 'Manage Messages' permission!",
-            color=discord.Color(0x3e0000)
+            color=discord.Color(0x3e0000))
         )
         return await interaction.response.send_message(embed=embed, ephemeral=True)
     
@@ -432,7 +432,7 @@ async def announce_only_attachment(interaction: discord.Interaction,
         embed = create_embed(
             title="❌ Announcement Failed",
             description=f"Error: {e}",
-            color=discord.Color(0x3e0000)
+            color=discord.Color(0x3e0000))
         )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
@@ -466,7 +466,7 @@ class DMModal(Modal, title='Send Direct Message'):
             # Create embed with footer and timestamp
             embed = discord.Embed(
                 description=formatted_message,
-                color=discord.Color(0x3e0000),
+                color=discord.Color(0x3e0000)),
                 timestamp=datetime.utcnow()
             )
             # Set footer with required text
@@ -535,124 +535,6 @@ async def dm_user(interaction: discord.Interaction,
         return
     
     await interaction.response.send_modal(DMModal(user, attachment))
-# In-Channel Reply Command
-@bot.tree.context_menu(name="Reply in Channel")
-async def reply_in_channel(interaction: discord.Interaction, message: discord.Message):
-    """Reply to a user's message in the channel"""
-    # Check permissions
-    if not interaction.user.guild_permissions.manage_messages:
-        await interaction.response.send_message(
-            embed=create_embed(
-                title="❌ Permission Denied",
-                description="You need 'Manage Messages' permission",
-                color=discord.Color.red()
-            ),
-            ephemeral=True
-        )
-        return
-    
-    # Create a modal for the reply
-    class ReplyModal(Modal, title='Reply in Channel'):
-        reply_content = TextInput(
-            label="Your reply",
-            style=discord.TextStyle.paragraph,
-            placeholder="Type your reply here...",
-            required=True
-        )
-        
-        async def on_submit(self, interaction: discord.Interaction):
-            # Send the reply mentioning the original author
-            await interaction.channel.send(
-                f"{message.author.mention}, {interaction.user.mention} replies:\n{self.reply_content}",
-                allowed_mentions=discord.AllowedMentions(users=True)
-            )
-            await interaction.response.send_message(
-                embed=create_embed(
-                    title="✅ Reply Sent",
-                    description="Your reply has been sent in the channel!",
-                    color=discord.Color.green()
-                ),
-                ephemeral=True
-            )
-    
-    await interaction.response.send_modal(ReplyModal())
-
-# DM Reply Command
-@bot.tree.context_menu(name="DM Reply")
-async def dm_reply_to_user(interaction: discord.Interaction, message: discord.Message):
-    """Reply to a user via DM regarding their message"""
-    # Check permissions
-    if not interaction.user.guild_permissions.manage_messages:
-        await interaction.response.send_message(
-            embed=create_embed(
-                title="❌ Permission Denied",
-                description="You need 'Manage Messages' permission",
-                color=discord.Color.red()
-            ),
-            ephemeral=True
-        )
-        return
-    
-    # Create modal for the reply
-    class ReplyModal(Modal, title='DM Reply to User'):
-        reply_message = TextInput(
-            label='Your reply',
-            style=discord.TextStyle.paragraph,
-            placeholder='Type your reply here...',
-            required=True
-        )
-        
-        async def on_submit(self, interaction: discord.Interaction):
-            try:
-                # Create the DM message with context
-                formatted_content = (
-                    f"**📩 Reply from {interaction.guild.name} regarding your message:**\n"
-                    f"```\n{message.content}\n```\n\n"
-                    f"**Moderator's reply:**\n"
-                    f"```\n{self.reply_message.value}\n```\n\n"
-                    "For any queries or further support, contact @acroneop in our Official Server:\n"
-                    "https://discord.gg/xPGJCWpMbM"
-                )
-                
-                embed = discord.Embed(
-                    description=formatted_content,
-                    color=discord.Color(0x3e0000),
-                    timestamp=datetime.utcnow()
-                )
-                embed.set_footer(text="Nexus Esports Official | DM Moderators or Officials for any Query!")
-                
-                # Send the DM
-                await message.author.send(embed=embed)
-                
-                # Confirm to the moderator
-                await interaction.response.send_message(
-                    embed=create_embed(
-                        title="✅ Reply Sent",
-                        description=f"Reply sent to {message.author.mention} via DM!",
-                        color=discord.Color.green()
-                    ),
-                    ephemeral=True
-                )
-            except discord.Forbidden:
-                await interaction.response.send_message(
-                    embed=create_embed(
-                        title="❌ Failed to Send DM",
-                        description="This user has DMs disabled or blocked the bot.",
-                        color=discord.Color.red()
-                    ),
-                    ephemeral=True
-                )
-            except Exception as e:
-                await interaction.response.send_message(
-                    embed=create_embed(
-                        title="❌ Error",
-                        description=f"An error occurred: {str(e)}",
-                        color=discord.Color.red()
-                    ),
-                    ephemeral=True
-                )
-    
-    await interaction.response.send_modal(ReplyModal())
 
 # New: DM Reply Command (Context Menu)
 @bot.tree.context_menu(name="DM Reply to User")
@@ -693,7 +575,7 @@ async def dm_reply_to_user(interaction: discord.Interaction, message: discord.Me
                 
                 embed = discord.Embed(
                     description=formatted_content,
-                    color=discord.Color(0x3e0000),
+                    color=discord.Color(0x3e0000)),
                     timestamp=datetime.utcnow()
                 )
                 embed.set_footer(text="Nexus Esports Official | DM Moderators or Officials for any Query!")
@@ -823,7 +705,7 @@ async def on_member_join(member: discord.Member):
                         f"Bro {member.mention},\n\n"  # Mention outside the code block
                         f"```\n{welcome_text}\n```"   # Instructions inside code block
                     ),
-                    color=discord.Color(0x3e0000)
+                    color=discord.Color(0x3e0000))
                 )
                 # Set GIF
                 embed.set_image(url="https://cdn.discordapp.com/attachments/1378018158010695722/1378426905585520901/standard_2.gif")
@@ -841,7 +723,7 @@ async def on_member_join(member: discord.Member):
             # Use configured DM
             embed = discord.Embed(
                 description=welcome_dm,
-                color=discord.Color(0x3e0000),
+                color=discord.Color(0x3e0000)),
                 timestamp=datetime.utcnow()
             )
             embed.set_footer(text="Nexus Esports Official | DM Moderators or Officials for any Query!")
@@ -874,7 +756,7 @@ async def on_member_join(member: discord.Member):
             
             embed = discord.Embed(
                 description=dm_message,
-                color=discord.Color(0x3e0000),
+                color=discord.Color(0x3e0000)),
                 timestamp=datetime.utcnow()
             )
             embed.set_footer(text="Nexus Esports Official | DM Moderators or Officials for any Query!")
@@ -888,7 +770,6 @@ async def on_member_join(member: discord.Member):
     except Exception as e:
         print(f"⚠️ Error sending welcome DM: {e}")
 
-# Other commands remain the same
 @bot.tree.command(name="ping", description="Test bot responsiveness")
 async def ping(interaction: discord.Interaction):
     """Simple ping command with latency check"""
@@ -929,6 +810,136 @@ async def check_perms(interaction: discord.Interaction):
     )
     
     await interaction.response.send_message(embed=embed, ephemeral=True)
+
+@bot.tree.command(name="add-link", description="Add a professional formatted link")
+@app_commands.describe(
+    url="The URL to add (must start with http:// or https://)",
+    title="(Optional) Title for the link",
+    description="(Optional) Description text"
+)
+async def add_link(interaction: discord.Interaction, 
+                  url: str, 
+                  title: Optional[str] = None,
+                  description: Optional[str] = None):
+    """Add a professional formatted link with Nexus Esports styling"""
+    # Validate URL format
+    if not url.startswith(("http://", "https://")):
+        return await interaction.response.send_message(
+            embed=create_embed(
+                title="❌ Invalid URL",
+                description="URL must start with http:// or https://",
+                color=discord.Color.red()
+            ),
+            ephemeral=True
+        )
+    
+    try:
+        # Create the core link text
+        link_text = f"[Click Here]({url})"
+        
+        # Build the embed description
+        embed_description = f"**➤ {link_text}**"
+        if description:
+            embed_description += f"\n\n{description}"
+        
+        # Create the embed
+        embed = create_embed(
+            title=title if title else "🔗 Nexus Esports Link",
+            description=embed_description,
+            color=discord.Color(0x3e0000))
+        )
+        # Make the title clickable
+        embed.url = url
+        
+        # Send the formatted link
+        await interaction.response.send_message(embed=embed)
+        
+    except Exception as e:
+        await interaction.response.send_message(
+            embed=create_embed(
+                title="❌ Error Creating Link",
+                description=f"An error occurred: {str(e)}",
+                color=discord.Color.red()
+            ),
+            ephemeral=True
+        )
+
+# New: Reply in Channel Command
+@bot.tree.command(name="reply-in-channel", description="Reply to a user in this channel (Mods only)")
+@app_commands.describe(
+    user="The user you're replying to",
+    message="Your reply message content",
+    message_id="(Optional) ID of the specific message to reply to"
+)
+async def reply_in_channel(interaction: discord.Interaction, 
+                         user: discord.Member,
+                         message: str,
+                         message_id: Optional[str] = None):
+    """Reply to a user in the current channel with professional formatting"""
+    # Check permissions
+    if not interaction.user.guild_permissions.manage_messages:
+        return await interaction.response.send_message(
+            embed=create_embed(
+                title="❌ Permission Denied",
+                description="You need 'Manage Messages' permission to use this command",
+                color=discord.Color.red()
+            ),
+            ephemeral=True
+        )
+    
+    try:
+        # Create the arrow symbol and formatted message
+        arrow = "↳"
+        formatted_content = (
+            f"{arrow} **Replying to {user.mention}**\n\n"
+            f"```\n{message}\n```"
+        )
+        
+        # Create embed
+        embed = discord.Embed(
+            description=formatted_content,
+            color=discord.Color(0x3e0000),
+            timestamp=datetime.utcnow()
+        )
+        embed.set_footer(text="Nexus Esports Official | DM Moderators or Officials for any Query!")
+        
+        # Handle message reference if provided
+        reference = None
+        if message_id:
+            try:
+                message_id_int = int(message_id)
+                # Fetch the message to verify it exists
+                ref_message = await interaction.channel.fetch_message(message_id_int)
+                reference = ref_message.to_reference(fail_if_not_exists=False)
+            except (ValueError, discord.NotFound, discord.HTTPException):
+                # Send without reference if message not found
+                pass
+        
+        # Send the reply
+        await interaction.channel.send(
+            embed=embed,
+            reference=reference
+        )
+        
+        # Confirm to moderator
+        await interaction.response.send_message(
+            embed=create_embed(
+                title="✅ Reply Sent",
+                description=f"Replied to {user.mention} in {interaction.channel.mention}",
+                color=discord.Color.green()
+            ),
+            ephemeral=True
+        )
+        
+    except Exception as e:
+        await interaction.response.send_message(
+            embed=create_embed(
+                title="❌ Reply Failed",
+                description=f"Error: {str(e)}",
+                color=discord.Color.red()
+            ),
+            ephemeral=True
+        )
 
 @bot.event
 async def on_guild_join(guild):
