@@ -1259,9 +1259,9 @@ async def add_social_tracker(interaction: discord.Interaction,
             # Try to parse follower count
             try:
                 if 'K' in followers_str:
-                    account_info['last_count'] = int(float(followers_str.replace('K', '')) * 1000
+                    account_info['last_count'] = int(float(followers_str.replace('K', '')) * 1000)
                 elif 'M' in followers_str:
-                    account_info['last_count'] = int(float(followers_str.replace('M', '')) * 1000000
+                    account_info['last_count'] = int(float(followers_str.replace('M', '')) * 1000000)
                 else:
                     account_info['last_count'] = int(followers_str.replace(',', ''))
             except Exception as e:
@@ -1406,8 +1406,9 @@ async def on_guild_join(guild):
     except Exception as e:
         print(f"❌ Failed to sync commands for {guild.name}: {e}")
 
+t
 @bot.event
-async极 on_guild_remove(guild):
+async def on_guild_remove(guild):
     """Handle leaving servers"""
     print(f"❌ Left server: {guild.name} (ID: {guild.id})")
     # Clean up config
