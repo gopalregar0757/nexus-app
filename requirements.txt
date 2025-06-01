@@ -1,6 +1,2 @@
 discord.py
 flask
-asyncio
-requests
-BeautifulSoup
-googleapiclient
