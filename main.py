@@ -1150,23 +1150,31 @@ async def add_social_tracker(interaction: discord.Interaction,
             if "youtube.com/channel/" in account_url:
                 channel_id = account_url.split("youtube.com/channel/")[1].split("/")[0].split("?")[0]
             elif "youtube.com/@" in account_url:
-                handle = account_url.split("youtube.com/@")[1].split("/")[0].split("?")[0]
-                search_response = youtube_service.search().list(
-                    q=handle,
-                    part='snippet',
-                    type='channel',
-                    maxResults=1
-                ).execute()
-                if not search_response.get('items'):
-                    return await interaction.response.send_message(
-                        embed=create_embed(
-                            title="❌ Channel Not Found",
-                            description="Couldn't find YouTube channel",
-                            color=discord.Color.red()
-                        ),
-                        ephemeral=True
-                    )
-                channel_id = search_response['items'][0]['snippet']['channelId']
+    handle = account_url.split("youtube.com/@")[1].split("/")[0].split("?")[0]
+    
+    # NEW: Use channels().list with forHandle parameter
+    try:
+        request = youtube_service.channels().list(
+            part="id,snippet",
+            forHandle=f"@{handle}"
+        )
+        response = request.execute()
+        
+        if not response.get('items'):
+            return await interaction.response.send_message(
+                embed=create_embed(
+                    title="❌ Channel Not Found",
+                    description="Couldn't find YouTube channel with that handle",
+                    color=discord.Color.red()
+                ),
+                ephemeral=True
+            )
+            
+        channel_id = response['items'][0]['id']  # Exact match
+    
+    # Keep existing error handling
+    except HttpError as e:
+        # Error handling
             else:
                 return await interaction.response.send_message(
                     embed=create_embed(
