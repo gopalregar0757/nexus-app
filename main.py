@@ -18,6 +18,10 @@ if not token:
     print("❌ CRITICAL ERROR: Missing DISCORD_TOKEN")
     exit(1)
 
+# YouTube API setup
+YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
+youtube_service = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY) if YOUTUBE_API_KEY else None
+
 # Configure intents
 intents = discord.Intents.default()
 intents.message_content = True
@@ -52,8 +56,30 @@ def save_config():
     except Exception as e:
         print(f"⚠️ Error saving config: {e}")
 
-# Load config on startup
+# Social tracker storage
+SOCIAL_FILE = "social_trackers.json"
+social_trackers = {}
+
+def load_social_trackers():
+    global social_trackers
+    try:
+        if os.path.exists(SOCIAL_FILE):
+            with open(SOCIAL_FILE, 'r') as f:
+                social_trackers = json.load(f)
+    except Exception as e:
+        print(f"⚠️ Error loading social trackers: {e}")
+        social_trackers = {}
+
+def save_social_trackers():
+    try:
+        with open(SOCIAL_FILE, 'w') as f:
+            json.dump(social_trackers, f, indent=2)
+    except Exception as e:
+        print(f"⚠️ Error saving social trackers: {e}")
+
+# Load configs on startup
 load_config()
+load_social_trackers()
 
 @bot.event
 async def on_ready():
@@ -83,6 +109,134 @@ async def on_ready():
             print(f"✅ Synced {len(synced)} command(s) globally")
         except Exception as e:
             print(f"❌ Command sync failed: {e}")
+    
+    # Start social task
+    if not hasattr(bot, 'social_task'):
+        bot.social_task = bot.loop.create_task(social_update_task())
+        print("✅ Started social media tracking task")
+
+# Background task for social updates
+async def social_update_task():
+    await bot.wait_until_ready()
+    while not bot.is_closed():
+        try:
+            await check_social_updates()
+        except Exception as e:
+            print(f"⚠️ Social update error: {e}")
+        await asyncio.sleep(300)  # Check every 5 minutes
+
+async def check_social_updates():
+    for guild_id, trackers in list(social_trackers.items()):
+        for tracker in trackers[:]:  # Use copy for safe iteration
+            try:
+                if tracker['platform'] == 'youtube':
+                    await check_youtube_update(guild_id, tracker)
+                elif tracker['platform'] == 'instagram':
+                    await check_instagram_update(guild_id, tracker)
+            except Exception as e:
+                print(f"⚠️ Error checking {tracker['platform']} tracker: {e}")
+
+async def check_youtube_update(guild_id, tracker):
+    if not youtube_service:
+        return
+        
+    try:
+        request = youtube_service.channels().list(
+            part='statistics,snippet',
+            id=tracker['channel_id']
+        )
+        response = request.execute()
+        
+        if not response.get('items'):
+            return
+        
+        stats = response['items'][0]['statistics']
+        current_subs = int(stats['subscriberCount'])
+        last_subs = tracker.get('last_count', 0)
+        
+        if current_subs > last_subs:
+            # Get channel name
+            channel_name = response['items'][0]['snippet']['title']
+            
+            # Calculate growth
+            growth = current_subs - last_subs
+            
+            # Update tracker
+            tracker['last_count'] = current_subs
+            save_social_trackers()
+            
+            # Send notification
+            channel = bot.get_channel(int(tracker['post_channel']))
+            if channel:
+                embed = discord.Embed(
+                    title="🎉 YouTube Milestone Reached!",
+                    description=(
+                        f"**{channel_name}** just hit **{current_subs:,} subscribers**!\n"
+                        f"`+{growth:,}` since last update"
+                    ),
+                    color=discord.Color.red(),
+                    url=tracker['url']
+                )
+                embed.set_thumbnail(url="https://i.imgur.com/krKzGz0.png")
+                embed.set_footer(text="Nexus Esports Social Tracker")
+                await channel.send(embed=embed)
+    except HttpError as e:
+        print(f"YouTube API error: {e}")
+    except Exception as e:
+        print(f"General YouTube error: {e}")
+
+async def check_instagram_update(guild_id, tracker):
+    # Instagram requires web scraping - use carefully
+    try:
+        response = requests.get(tracker['url'], headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+        }, timeout=10)
+        soup = BeautifulSoup(response.text, 'html.parser')
+        
+        # Find follower count in meta tags
+        meta_tag = soup.find('meta', property='og:description')
+        if meta_tag:
+            content = meta_tag.get('content', '')
+            # Extract follower count from string like "1M Followers, 500 Following..."
+            if 'Followers' in content:
+                followers_str = content.split(' Followers')[0].split(' ')[-1]
+                # Convert to number
+                if followers_str.endswith('K'):
+                    current_followers = int(float(followers_str.replace('K', '')) * 1000)
+                elif followers_str.endswith('M'):
+                    current_followers = int(float(followers_str.replace('M', '')) * 1000000)
+                else:
+                    current_followers = int(followers_str.replace(',', ''))
+            else:
+                return
+        else:
+            return
+        
+        last_followers = tracker.get('last_count', 0)
+        
+        if current_followers > last_followers:
+            # Update tracker
+            tracker['last_count'] = current_followers
+            save_social_trackers()
+            
+            # Send notification
+            channel = bot.get_channel(int(tracker['post_channel']))
+            if channel:
+                growth = current_followers - last_followers
+                embed = discord.Embed(
+                    title="📸 Instagram Growth!",
+                    description=(
+                        f"**{tracker['account_name']}** now has **{current_followers:,} followers**!\n"
+                        f"`+{growth:,}` since last update"
+                    ),
+                    color=discord.Color.purple(),
+                    url=tracker['url']
+                )
+                embed.set_thumbnail(url="https://i.imgur.com/vn8M9aO.png")
+                embed.set_footer(text="Nexus Esports Social Tracker")
+                await channel.send(embed=embed)
+    except Exception as e:
+        print(f"Instagram scraping failed: {e}")
 
 # Auto-reply to DMs
 @bot.event
@@ -261,7 +415,7 @@ async def sync_commands(interaction: discord.Interaction):
             title="❌ Sync Failed",
             description=description,
             color=discord.Color(0x3e0000)
-)
+        )
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
 # Modal for announcement text
@@ -892,179 +1046,61 @@ async def reply_in_channel(interaction: discord.Interaction,
             ephemeral=True
         )
     
-# Add to imports (top of file)
-import asyncio
-import requests
-from bs4 import BeautifulSoup
-from googleapiclient.discovery import build
-from googleapiclient.errors import HttpError
-
-# YouTube API setup (add after token)
-# Replace existing YOUTUBE_API_KEY code with:
-YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
-youtube_service = build('youtube', 'v3', developerKey=YOUTUBE_API_KEY) if YOUTUBE_API_KEY else None
-
-# Social tracker storage
-SOCIAL_FILE = "social_trackers.json"
-social_trackers = {}
-
-def load_social_trackers():
-    global social_trackers
     try:
-        if os.path.exists(SOCIAL_FILE):
-            with open(SOCIAL_FILE, 'r') as f:
-                social_trackers = json.load(f)
-    except Exception as e:
-        print(f"⚠️ Error loading social trackers: {e}")
-        social_trackers = {}
-
-def save_social_trackers():
-    try:
-        with open(SOCIAL_FILE, 'w') as f:
-            json.dump(social_trackers, f, indent=2)
-    except Exception as e:
-        print(f"⚠️ Error saving social trackers: {e}")
-
-# Load on startup (add in on_ready or before bot.run)
-load_social_trackers()
-
-# Add to on_ready() function (inside the function)
-@bot.event
-async def on_ready():
-    global commands_synced
-    print(f"✅ Bot ready! Logged in as {bot.user}")
-    
-    # ... existing code ...
-    
-    # Add this at the end of the on_ready function:
-    if not hasattr(bot, 'social_task'):
-        bot.social_task = bot.loop.create_task(social_update_task())
-        print("✅ Started social media tracking task")
-
-# Background task for checking social updates (add after on_ready)
-async def social_update_task():
-    await bot.wait_until_ready()
-    while not bot.is_closed():
-        try:
-            await check_social_updates()
-        except Exception as e:
-            print(f"⚠️ Social update error: {e}")
-        await asyncio.sleep(300)  # Check every 5 minutes
-
-async def check_social_updates():
-    for guild_id, trackers in list(social_trackers.items()):
-        for tracker in trackers[:]:  # Use copy for safe iteration
-            try:
-                if tracker['platform'] == 'youtube':
-                    await check_youtube_update(guild_id, tracker)
-                elif tracker['platform'] == 'instagram':
-                    await check_instagram_update(guild_id, tracker)
-            except Exception as e:
-                print(f"⚠️ Error checking {tracker['platform']} tracker: {e}")
-
-async def check_youtube_update(guild_id, tracker):
-    if not youtube_service:
-        return
-        
-    try:
-        request = youtube_service.channels().list(
-            part='statistics,snippet',
-            id=tracker['channel_id']
+        # Create the arrow symbol and formatted message
+        arrow = "↳"
+        formatted_content = (
+            f"{arrow} **Replying to {user.mention}**\n\n"
+            f"```\n{message}\n```"
         )
-        response = request.execute()
         
-        if not response.get('items'):
-            return
+        # Create embed
+        embed = discord.Embed(
+            description=formatted_content,
+            color=discord.Color(0x3e0000),
+            timestamp=datetime.utcnow()
+        )
+        embed.set_footer(text="Nexus Esports Official | DM Moderators or Officials for any Query!")
         
-        stats = response['items'][0]['statistics']
-        current_subs = int(stats['subscriberCount'])
-        last_subs = tracker.get('last_count', 0)
+        # Handle message reference if provided
+        reference = None
+        if message_id:
+            try:
+                message_id_int = int(message_id)
+                # Fetch the message to verify it exists
+                ref_message = await interaction.channel.fetch_message(message_id_int)
+                reference = ref_message.to_reference(fail_if_not_exists=False)
+            except (ValueError, discord.NotFound, discord.HTTPException):
+                # Send without reference if message not found
+                pass
         
-        if current_subs > last_subs:
-            # Get channel name
-            channel_name = response['items'][0]['snippet']['title']
-            
-            # Calculate growth
-            growth = current_subs - last_subs
-            
-            # Update tracker
-            tracker['last_count'] = current_subs
-            save_social_trackers()
-            
-            # Send notification
-            channel = bot.get_channel(int(tracker['post_channel']))
-            if channel:
-                embed = discord.Embed(
-                    title="🎉 YouTube Milestone Reached!",
-                    description=(
-                        f"**{channel_name}** just hit **{current_subs:,} subscribers**!\n"
-                        f"`+{growth:,}` since last update"
-                    ),
-                    color=discord.Color.red(),
-                    url=tracker['url']
-                )
-                embed.set_thumbnail(url="https://i.imgur.com/krKzGz0.png")
-                embed.set_footer(text="Nexus Esports Social Tracker")
-                await channel.send(embed=embed)
-    except HttpError as e:
-        print(f"YouTube API error: {e}")
+        # Send the reply
+        await interaction.channel.send(
+            embed=embed,
+            reference=reference
+        )
+        
+        # Confirm to moderator
+        await interaction.response.send_message(
+            embed=create_embed(
+                title="✅ Reply Sent",
+                description=f"Replied to {user.mention} in {interaction.channel.mention}",
+                color=discord.Color.green()
+            ),
+            ephemeral=True
+        )
+        
     except Exception as e:
-        print(f"General YouTube error: {e}")
+        await interaction.response.send_message(
+            embed=create_embed(
+                title="❌ Reply Failed",
+                description=f"Error: {str(e)}",
+                color=discord.Color.red()
+            ),
+            ephemeral=True
+        )
 
-async def check_instagram_update(guild_id, tracker):
-    # Instagram requires web scraping - use carefully
-    try:
-        response = requests.get(tracker['url'], headers={
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }, timeout=10)
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # Find follower count in meta tags
-        meta_tag = soup.find('meta', property='og:description')
-        if meta_tag:
-            content = meta_tag.get('content', '')
-            # Extract follower count from string like "1M Followers, 500 Following..."
-            if 'Followers' in content:
-                followers_str = content.split(' Followers')[0].split(' ')[-1]
-                # Convert to number
-                if followers_str.endswith('K'):
-                    current_followers = int(float(followers_str.replace('K', '')) * 1000)  # Added closing )
-                elif followers_str.endswith('M'):
-                    current_followers = int(float(followers_str.replace('M', '')) * 1000000)  # Added closing )
-                else:
-                    current_followers = int(followers_str.replace(',', ''))
-            else:
-                return
-        else:
-            return
-        
-        last_followers = tracker.get('last_count', 0)
-        
-        if current_followers > last_followers:
-            # Update tracker
-            tracker['last_count'] = current_followers
-            save_social_trackers()
-            
-            # Send notification
-            channel = bot.get_channel(int(tracker['post_channel']))
-            if channel:
-                growth = current_followers - last_followers
-                embed = discord.Embed(
-                    title="📸 Instagram Growth!",
-                    description=(
-                        f"**{tracker['account_name']}** now has **{current_followers:,} followers**!\n"
-                        f"`+{growth:,}` since last update"
-                    ),
-                    color=discord.Color.purple(),
-                    url=tracker['url']
-                )
-                embed.set_thumbnail(url="https://i.imgur.com/vn8M9aO.png")
-                embed.set_footer(text="Nexus Esports Social Tracker")
-                await channel.send(embed=embed)
-    except Exception as e:
-        print(f"Instagram scraping failed: {e}")
-
-# New command: add-social-tracker (add after other commands)
+# Social tracker commands
 @bot.tree.command(name="add-social-tracker", description="Add social media account tracking")
 @app_commands.describe(
     platform="Select platform to track",
@@ -1223,9 +1259,9 @@ async def add_social_tracker(interaction: discord.Interaction,
             # Try to parse follower count
             try:
                 if 'K' in followers_str:
-                    account_info['last_count'] = int(float(followers_str.replace('K', '')) * 1000)  # Added closing )
+                    account_info['last_count'] = int(float(followers_str.replace('K', '')) * 1000
                 elif 'M' in followers_str:
-                    account_info['last_count'] = int(float(followers_str.replace('M', '')) * 1000000)  # Added closing )
+                    account_info['last_count'] = int(float(followers_str.replace('M', '')) * 1000000
                 else:
                     account_info['last_count'] = int(followers_str.replace(',', ''))
             except Exception as e:
@@ -1258,7 +1294,6 @@ async def add_social_tracker(interaction: discord.Interaction,
         ephemeral=True
     )
 
-# New command: list-social-trackers
 @bot.tree.command(name="list-social-trackers", description="Show active social media trackers")
 async def list_social_trackers(interaction: discord.Interaction):
     """List active social trackers"""
@@ -1311,7 +1346,6 @@ async def list_social_trackers(interaction: discord.Interaction):
     embed.set_footer(text="Nexus Esports Social Tracker")
     await interaction.response.send_message(embed=embed, ephemeral=True)
 
-# New command: remove-social-tracker
 @bot.tree.command(name="remove-social-tracker", description="Remove a social media tracker")
 @app_commands.describe(index="Tracker number to remove (see /list-social-trackers)")
 async def remove_social_tracker(interaction: discord.Interaction, index: int):
@@ -1355,61 +1389,6 @@ async def remove_social_tracker(interaction: discord.Interaction, index: int):
         ephemeral=True
     )
 
-
-    try:
-        # Create the arrow symbol and formatted message
-        arrow = "↳"
-        formatted_content = (
-            f"{arrow} **Replying to {user.mention}**\n\n"
-            f"```\n{message}\n```"
-        )
-        
-        # Create embed
-        embed = discord.Embed(
-            description=formatted_content,
-            color=discord.Color(0x3e0000),
-            timestamp=datetime.utcnow()
-        )
-        embed.set_footer(text="Nexus Esports Official | DM Moderators or Officials for any Query!")
-        
-        # Handle message reference if provided
-        reference = None
-        if message_id:
-            try:
-                message_id_int = int(message_id)
-                # Fetch the message to verify it exists
-                ref_message = await interaction.channel.fetch_message(message_id_int)
-                reference = ref_message.to_reference(fail_if_not_exists=False)
-            except (ValueError, discord.NotFound, discord.HTTPException):
-                # Send without reference if message not found
-                pass
-        
-        # Send the reply
-        await interaction.channel.send(
-            embed=embed,
-            reference=reference
-        )
-        
-        # Confirm to moderator
-        await interaction.response.send_message(
-            embed=create_embed(
-                title="✅ Reply Sent",
-                description=f"Replied to {user.mention} in {interaction.channel.mention}",
-                color=discord.Color.green()
-            ),
-            ephemeral=True
-        )
-        
-    except Exception as e:
-        await interaction.response.send_message(
-            embed=create_embed(
-                title="❌ Reply Failed",
-                description=f"Error: {str(e)}",
-                color=discord.Color.red()
-            ),
-            ephemeral=True
-        )
-
 @bot.event
 async def on_guild_join(guild):
     """Handle joining new servers"""
@@ -1428,7 +1407,7 @@ async def on_guild_join(guild):
         print(f"❌ Failed to sync commands for {guild.name}: {e}")
 
 @bot.event
-async def on_guild_remove(guild):
+async极 on_guild_remove(guild):
     """Handle leaving servers"""
     print(f"❌ Left server: {guild.name} (ID: {guild.id})")
     # Clean up config
@@ -1436,6 +1415,10 @@ async def on_guild_remove(guild):
     if guild_id in guild_configs:
         del guild_configs[guild_id]
         save_config()
+    # Clean up social trackers
+    if guild_id in social_trackers:
+        del social_trackers[guild_id]
+        save_social_trackers()
 
 try:
     bot.run(token)
