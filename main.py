@@ -1406,7 +1406,7 @@ async def on_guild_join(guild):
     except Exception as e:
         print(f"❌ Failed to sync commands for {guild.name}: {e}")
 
-t
+
 @bot.event
 async def on_guild_remove(guild):
     """Handle leaving servers"""
