@@ -1028,9 +1028,9 @@ async def check_instagram_update(guild_id, tracker):
                 followers_str = content.split(' Followers')[0].split(' ')[-1]
                 # Convert to number
                 if followers_str.endswith('K'):
-                    current_followers = int(float(followers_str.replace('K', '')) * 1000
-                elif followers_str.endswith('M'):
-                    current_followers = int(float(followers_str.replace('M', '')) * 1000000
+    current_followers = int(float(followers_str.replace('K', '')) * 1000)  # Added closing )
+elif followers_str.endswith('M'):
+    current_followers = int(float(followers_str.replace('M', '')) * 1000000)  # Added closing )
                 else:
                     current_followers = int(followers_str.replace(',', ''))
             else:
@@ -1223,9 +1223,9 @@ async def add_social_tracker(interaction: discord.Interaction,
             # Try to parse follower count
             try:
                 if 'K' in followers_str:
-                    account_info['last_count'] = int(float(followers_str.replace('K', '')) * 1000
-                elif 'M' in followers_str:
-                    account_info['last_count'] = int(float(followers_str.replace('M', '')) * 1000000
+    account_info['last_count'] = int(float(followers_str.replace('K', '')) * 1000)  # Added closing )
+elif 'M' in followers_str:
+    account_info['last_count'] = int(float(followers_str.replace('M', '')) * 1000000)  # Added closing )
                 else:
                     account_info['last_count'] = int(followers_str.replace(',', ''))
             except Exception as e:
